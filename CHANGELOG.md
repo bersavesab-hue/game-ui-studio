@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.9.0
+
+- 新增 APK UI 拆解入口，可直接从手机选择 APK。
+- 新增 APK 安全扫描与框架识别：WebView/H5、原生 Android、Unity、Godot、未知/混合。
+- 可提取 APK 内图片、字体、XML、HTML/CSS/JS/JSON/SVG 等可用资源。
+- 针对 city-restaurant-game-v2 这类 WebView APK，识别 assets/index.html、game.css、game.js 与 ui-v2 资源目录。
+- 拆解结果显示包名、版本、框架、条目数及各类资源统计。
+- 提取出的图片可一键加入 Game UI Studio 全局素材库。
+- 可直接从拆解结果新建“APK 重建设计页”，继续用现有竖屏画布重做 UI。
+- 加入 Zip Slip 路径防护、单资源大小限制、总解包大小限制与最大条目限制，避免异常 APK 把编辑器拖死。
+- 第一阶段不伪装成源码还原：原生编译 XML、Unity Prefab/Atlas、Godot PCK 深度解析保留给后续版本。
+
+
 ## v0.8.0
 
 - 进入布局效率专项。
