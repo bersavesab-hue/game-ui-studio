@@ -124,6 +124,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
     var pendingJson by remember { mutableStateOf("") }
+    var exportTransparentPng by remember { mutableStateOf(false) }
 
     val preset = customPreset ?: PREVIEW_PRESETS[presetIndex]
     val editable = customPreset == null && presetIndex == 0
@@ -151,6 +152,41 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             }.onSuccess {
                 apkResult = it
                 showApkImport = true
+            }
+        }
+    }
+
+    val importProjectLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { ProjectStorage.importProjectZip(context, uri) }
+                .onSuccess {
+                    vm.loadProject(it)
+                    presetIndex = 0
+                    customPreset = null
+                    canvasZoom = 1f
+                }
+        }
+    }
+
+    val exportPngLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
+        if (uri != null) {
+            val page = EditorPage(
+                id = vm.currentPageId ?: "current",
+                name = vm.currentPage?.name ?: "页面",
+                elements = vm.elements.toList()
+            )
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    PagePngExporter.writeCurrentPage(context, page, output, exportTransparentPng)
+                }
+            }
+        }
+    }
+
+    val exportGameLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { output ->
+                ProjectStorage.writeGameIntegrationZip(context, vm.toProject(), output)
             }
         }
     }
@@ -345,6 +381,28 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                 if (canvasNavigationMode && vm.multiSelectMode) vm.toggleMultiSelectMode()
             },
             onSave = { ProjectStorage.save(context, vm.toProject()) },
+            onImportProject = {
+                showMoreTools = false
+                importProjectLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+            },
+            backupCount = ProjectStorage.backupCount(context),
+            onRestoreBackup = {
+                ProjectStorage.latestBackup(context)?.let {
+                    vm.loadProject(it)
+                    ProjectStorage.save(context, vm.toProject())
+                }
+            },
+            onExportPng = {
+                exportTransparentPng = false
+                exportPngLauncher.launch("${vm.currentPage?.name ?: "page"}.png")
+            },
+            onExportTransparentPng = {
+                exportTransparentPng = true
+                exportPngLauncher.launch("${vm.currentPage?.name ?: "page"}-transparent.png")
+            },
+            onExportGame = {
+                exportGameLauncher.launch("${vm.projectName}-game-ui.zip")
+            },
             onExportJson = {
                 pendingJson = ProjectStorage.projectJson(vm.toProject())
                 exportJsonLauncher.launch("${vm.projectName}.json")
@@ -735,6 +793,12 @@ private fun MoreToolsSheet(
     onToggleMulti: () -> Unit,
     onToggleNavigation: () -> Unit,
     onSave: () -> Unit,
+    onImportProject: () -> Unit,
+    backupCount: Int,
+    onRestoreBackup: () -> Unit,
+    onExportPng: () -> Unit,
+    onExportTransparentPng: () -> Unit,
+    onExportGame: () -> Unit,
     onExportJson: () -> Unit,
     onExportProject: () -> Unit
 ) {
@@ -771,6 +835,11 @@ private fun MoreToolsSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TinyButton("保存", onSave, primary = true)
+                TinyButton("导入工程", onImportProject)
+                TinyButton("恢复备份($backupCount)", onRestoreBackup, primary = backupCount > 0)
+                TinyButton("导出 PNG", onExportPng)
+                TinyButton("透明 PNG", onExportTransparentPng)
+                TinyButton("游戏接入包", onExportGame, primary = true)
                 TinyButton("导出 JSON", onExportJson)
                 TinyButton("导出工程", onExportProject)
             }
