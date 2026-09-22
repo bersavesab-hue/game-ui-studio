@@ -1171,6 +1171,10 @@ private fun SelectedToolBar(
     groupEditActive: Boolean,
     selectedGrouped: Boolean,
     onToggleCrop: () -> Unit,
+    onResetImage: () -> Unit,
+    onRotateLeft: () -> Unit,
+    onRotateRight: () -> Unit,
+    onNudge: (Float, Float) -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
     onFront: () -> Unit,
@@ -1204,7 +1208,12 @@ private fun SelectedToolBar(
         if (!editable) Text("当前为只读适配预览", color = Color(0xFFFBBF24), fontSize = 12.sp)
 
         if (selectedCount == 1 && selected?.type == ElementType.IMAGE && editable) {
-            TinyButton(if (cropMode) "退出裁剪" else "裁剪", onToggleCrop, primary = cropMode)
+            TinyButton(if (cropMode) "完成裁剪" else "裁剪", onToggleCrop, primary = cropMode)
+            if (cropMode) {
+                TinyButton("重置", onResetImage)
+                TinyButton("左转", onRotateLeft)
+                TinyButton("右转", onRotateRight)
+            }
         }
         if (editable && groupEditActive) {
             TinyButton("退出组内编辑", onExitGroupEdit, primary = true)
@@ -1213,6 +1222,12 @@ private fun SelectedToolBar(
         }
 
         if (editable) {
+            if (selectedCount == 1 && !cropMode && selected?.isBackground != true) {
+                TinyButton("←", { onNudge(-4f, 0f) })
+                TinyButton("↑", { onNudge(0f, -4f) })
+                TinyButton("↓", { onNudge(0f, 4f) })
+                TinyButton("→", { onNudge(4f, 0f) })
+            }
             TinyButton("复制", onDuplicate)
             TinyButton("置顶", onFront)
             TinyButton("置底", onBack)
