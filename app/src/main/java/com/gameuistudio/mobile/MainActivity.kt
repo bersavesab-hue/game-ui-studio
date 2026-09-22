@@ -202,7 +202,8 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             Box(
                 Modifier.fillMaxSize().padding(
-                    horizontal = 6.dp,
+                    start = 6.dp,
+                    end = 6.dp,
                     bottom = if (vm.selectedIds.isNotEmpty()) 114.dp else 58.dp
                 )
             ) {
