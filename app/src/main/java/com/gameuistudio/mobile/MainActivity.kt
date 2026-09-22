@@ -2,6 +2,9 @@ package com.gameuistudio.mobile
 
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -28,6 +31,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -79,6 +83,11 @@ import kotlin.math.min
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 EditorApp()
@@ -99,6 +108,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var showLayers by remember { mutableStateOf(false) }
     var showPages by remember { mutableStateOf(false) }
     var showLibrary by remember { mutableStateOf(false) }
+    var showMoreTools by remember { mutableStateOf(false) }
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
     var pendingJson by remember { mutableStateOf("") }
@@ -156,22 +166,15 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     }
 
     Scaffold(
-        containerColor = Color(0xFF0D1015),
+        containerColor = Color(0xFF0B0D10),
+        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
         topBar = {
-            TopEditorBar(
+            CompactTopBar(
                 projectName = vm.projectName,
                 preset = preset,
                 zoom = canvasZoom,
-                safeArea = showSafeArea,
-                snapping = vm.snappingEnabled,
-                multiSelect = vm.multiSelectMode,
-                navigationMode = canvasNavigationMode,
                 onUndo = vm::undo,
                 onRedo = vm::redo,
-                onImport = { imageLauncher.launch(arrayOf("image/*")) },
-                onAddText = vm::addText,
-                onAddButton = vm::addButton,
-                onAddPanel = vm::addPanel,
                 onPresetClick = { showPresetMenu = true },
                 presetMenu = {
                     DropdownMenu(expanded = showPresetMenu, onDismissRequest = { showPresetMenu = false }) {
@@ -191,110 +194,127 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                         }
                     }
                 },
-                onZoomOut = { canvasZoom = (canvasZoom - 0.1f).coerceAtLeast(0.5f) },
-                onZoomIn = { canvasZoom = (canvasZoom + 0.1f).coerceAtMost(2.5f) },
+                onZoomOut = { canvasZoom = (canvasZoom - 0.1f).coerceAtLeast(0.35f) },
+                onZoomIn = { canvasZoom = (canvasZoom + 0.1f).coerceAtMost(3f) },
                 onFit = { canvasZoom = 1f },
-                onToggleSafe = { showSafeArea = !showSafeArea },
-                onToggleSnap = vm::toggleSnapping,
+                onMore = { showMoreTools = true }
+            )
+        }
+    ) { innerPadding ->
+        Box(Modifier.padding(innerPadding).fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().padding(
+                    start = 58.dp,
+                    end = 58.dp,
+                    bottom = if (vm.selectedIds.isNotEmpty()) 56.dp else 6.dp
+                )
+            ) {
+                CanvasWorkspace(
+                    vm = vm,
+                    preset = preset,
+                    canvasZoom = canvasZoom,
+                    showSafeArea = showSafeArea,
+                    editable = editable && !canvasNavigationMode,
+                    cropMode = cropMode,
+                    navigationMode = canvasNavigationMode,
+                    assetsRoot = File(context.filesDir, "game_ui_studio/current"),
+                    onCanvasZoomChange = { canvasZoom = it.coerceIn(0.35f, 3f) }
+                )
+
+                if (canvasNavigationMode) {
+                    EditorModeBadge("画布导航 · 拖动 / 双指缩放", Color(0xDD7C3AED))
+                } else if (!editable) {
+                    EditorModeBadge("适配预览 · 只读", Color(0xCC111318))
+                } else if (vm.multiSelectMode) {
+                    EditorModeBadge("多选 · 点选或拖框", Color(0xDD0F766E))
+                }
+            }
+
+            MobileToolRail(
+                modifier = Modifier.align(Alignment.CenterStart),
+                onImport = { imageLauncher.launch(arrayOf("image/*")) },
+                onAddText = vm::addText,
+                onAddButton = vm::addButton,
+                onAddPanel = vm::addPanel,
+                multiSelect = vm.multiSelectMode,
+                navigationMode = canvasNavigationMode,
                 onToggleMulti = vm::toggleMultiSelectMode,
                 onToggleNavigation = {
                     canvasNavigationMode = !canvasNavigationMode
                     if (canvasNavigationMode && vm.multiSelectMode) vm.toggleMultiSelectMode()
-                },
+                }
+            )
+
+            QuickRail(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                hasSelection = vm.selectedIds.size == 1,
                 onLayers = { showLayers = true },
                 onPages = { showPages = true },
                 onLibrary = { showLibrary = true },
-                onSave = { ProjectStorage.save(context, vm.toProject()) },
-                onExportJson = {
-                    pendingJson = ProjectStorage.projectJson(vm.toProject())
-                    exportJsonLauncher.launch("${vm.projectName}.json")
-                },
-                onExportProject = { exportZipLauncher.launch("${vm.projectName}.guiproject.zip") }
-            )
-        },
-        bottomBar = {
-            Column(Modifier.background(Color(0xFF171B22))) {
-                PageStrip(vm)
-                AssetStrip(
-                    elements = vm.elements.filter { it.type == ElementType.IMAGE },
-                    selectedIds = vm.selectedIds.toSet(),
-                    contextFilesRoot = File(context.filesDir, "game_ui_studio/current"),
-                    onSelect = { vm.selectElement(it) }
-                )
-                SelectedToolBar(
-                    selected = vm.selected,
-                    selectedCount = vm.selectedIds.size,
-                    cropMode = cropMode,
-                    editable = editable && !canvasNavigationMode,
-                    multiSelect = vm.multiSelectMode,
-                    groupEditActive = vm.activeGroupEditId != null,
-                    selectedGrouped = vm.selection.mapNotNull { it.groupId }.distinct().size == 1,
-                    onToggleCrop = {
-                        if (!cropMode) vm.beginTransaction() else vm.endTransaction()
-                        cropMode = !cropMode
-                    },
-                    onDuplicate = vm::duplicateSelected,
-                    onDelete = vm::deleteSelected,
-                    onFront = vm::bringToFront,
-                    onBack = vm::sendToBack,
-                    onLock = vm::toggleLock,
-                    onGroup = vm::groupSelected,
-                    onUngroup = vm::ungroupSelected,
-                    onEnterGroupEdit = vm::enterSelectedGroupEdit,
-                    onExitGroupEdit = vm::exitGroupEdit,
-                    onAlign = vm::alignSelected,
-                    onDistributeH = { vm.distributeSelected(horizontal = true) },
-                    onDistributeV = { vm.distributeSelected(horizontal = false) },
-                    onProperties = { if (vm.selectedIds.size == 1) showProperties = true },
-                    onFinishMulti = { if (vm.multiSelectMode) vm.toggleMultiSelectMode() }
-                )
-            }
-        }
-    ) { innerPadding ->
-        Box(Modifier.padding(innerPadding).fillMaxSize()) {
-            CanvasWorkspace(
-                vm = vm,
-                preset = preset,
-                canvasZoom = canvasZoom,
-                showSafeArea = showSafeArea,
-                editable = editable && !canvasNavigationMode,
-                cropMode = cropMode,
-                navigationMode = canvasNavigationMode,
-                assetsRoot = File(context.filesDir, "game_ui_studio/current"),
-                onCanvasZoomChange = { canvasZoom = it.coerceIn(0.35f, 3f) }
+                onProperties = { if (vm.selectedIds.size == 1) showProperties = true }
             )
 
-            if (canvasNavigationMode) {
-                Text(
-                    "画布导航 · 拖动画布 / 双指缩放",
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)
-                        .background(Color(0xDD7C3AED), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
-            }
-            if (!editable) {
-                Text(
-                    "适配预览 · 只读",
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)
-                        .background(Color(0xCC111318), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
-            }
-            if (editable && vm.multiSelectMode) {
-                Text(
-                    "多选模式 · 点元素或在空白处拖框选择",
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp)
-                        .background(Color(0xDD0F766E), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
+            if (vm.selectedIds.isNotEmpty()) {
+                Box(
+                    Modifier.align(Alignment.BottomCenter)
+                        .padding(start = 58.dp, end = 58.dp, bottom = 2.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xF2181C23))
+                        .border(1.dp, Color(0xFF343B47), RoundedCornerShape(14.dp))
+                ) {
+                    SelectedToolBar(
+                        selected = vm.selected,
+                        selectedCount = vm.selectedIds.size,
+                        cropMode = cropMode,
+                        editable = editable && !canvasNavigationMode,
+                        multiSelect = vm.multiSelectMode,
+                        groupEditActive = vm.activeGroupEditId != null,
+                        selectedGrouped = vm.selection.mapNotNull { it.groupId }.distinct().size == 1,
+                        onToggleCrop = {
+                            if (!cropMode) vm.beginTransaction() else vm.endTransaction()
+                            cropMode = !cropMode
+                        },
+                        onDuplicate = vm::duplicateSelected,
+                        onDelete = vm::deleteSelected,
+                        onFront = vm::bringToFront,
+                        onBack = vm::sendToBack,
+                        onLock = vm::toggleLock,
+                        onGroup = vm::groupSelected,
+                        onUngroup = vm::ungroupSelected,
+                        onEnterGroupEdit = vm::enterSelectedGroupEdit,
+                        onExitGroupEdit = vm::exitGroupEdit,
+                        onAlign = vm::alignSelected,
+                        onDistributeH = { vm.distributeSelected(horizontal = true) },
+                        onDistributeV = { vm.distributeSelected(horizontal = false) },
+                        onProperties = { if (vm.selectedIds.size == 1) showProperties = true },
+                        onFinishMulti = { if (vm.multiSelectMode) vm.toggleMultiSelectMode() }
+                    )
+                }
             }
         }
+    }
+
+    if (showMoreTools) {
+        MoreToolsSheet(
+            safeArea = showSafeArea,
+            snapping = vm.snappingEnabled,
+            multiSelect = vm.multiSelectMode,
+            navigationMode = canvasNavigationMode,
+            onDismiss = { showMoreTools = false },
+            onToggleSafe = { showSafeArea = !showSafeArea },
+            onToggleSnap = vm::toggleSnapping,
+            onToggleMulti = vm::toggleMultiSelectMode,
+            onToggleNavigation = {
+                canvasNavigationMode = !canvasNavigationMode
+                if (canvasNavigationMode && vm.multiSelectMode) vm.toggleMultiSelectMode()
+            },
+            onSave = { ProjectStorage.save(context, vm.toProject()) },
+            onExportJson = {
+                pendingJson = ProjectStorage.projectJson(vm.toProject())
+                exportJsonLauncher.launch("${vm.projectName}.json")
+            },
+            onExportProject = { exportZipLauncher.launch("${vm.projectName}.guiproject.zip") }
+        )
     }
 
     if (showProperties && vm.selected != null && vm.selectedIds.size == 1) {
@@ -321,67 +341,195 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
 }
 
 @Composable
-private fun TopEditorBar(
+private fun CompactTopBar(
     projectName: String,
     preset: PreviewPreset,
     zoom: Float,
-    safeArea: Boolean,
-    snapping: Boolean,
-    multiSelect: Boolean,
-    navigationMode: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onImport: () -> Unit,
-    onAddText: () -> Unit,
-    onAddButton: () -> Unit,
-    onAddPanel: () -> Unit,
     onPresetClick: () -> Unit,
     presetMenu: @Composable () -> Unit,
     onZoomOut: () -> Unit,
     onZoomIn: () -> Unit,
     onFit: () -> Unit,
+    onMore: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().height(48.dp).background(Color(0xFF171B22)).padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(
+            projectName,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        CompactButton("↶", onUndo)
+        CompactButton("↷", onRedo)
+        Box {
+            CompactButton(preset.label, onPresetClick, wide = true)
+            presetMenu()
+        }
+        CompactButton("−", onZoomOut)
+        Text("${(zoom * 100).toInt()}%", color = Color(0xFFCDD5E1), fontSize = 11.sp)
+        CompactButton("+", onZoomIn)
+        CompactButton("适配", onFit, wide = true, primary = true)
+        CompactButton("⋯", onMore)
+    }
+}
+
+@Composable
+private fun CompactButton(
+    text: String,
+    onClick: () -> Unit,
+    wide: Boolean = false,
+    primary: Boolean = false,
+    enabled: Boolean = true
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.height(36.dp).width(if (wide) 64.dp else 40.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (primary) Color(0xFF2563EB) else Color(0xFF2A303A),
+            disabledContainerColor = Color(0xFF20242B),
+            disabledContentColor = Color(0xFF657080)
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+    ) {
+        Text(text, fontSize = if (wide) 11.sp else 16.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ToolRailButton(
+    label: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+    enabled: Boolean = true
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(46.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (active) Color(0xFF2563EB) else Color(0xE6222730),
+            disabledContainerColor = Color(0x88222730),
+            disabledContentColor = Color(0xFF5D6673)
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+    ) {
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun MobileToolRail(
+    modifier: Modifier = Modifier,
+    onImport: () -> Unit,
+    onAddText: () -> Unit,
+    onAddButton: () -> Unit,
+    onAddPanel: () -> Unit,
+    multiSelect: Boolean,
+    navigationMode: Boolean,
+    onToggleMulti: () -> Unit,
+    onToggleNavigation: () -> Unit
+) {
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xD9171B22)).padding(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ToolRailButton("图片", onImport)
+        ToolRailButton("文字", onAddText)
+        ToolRailButton("按钮", onAddButton)
+        ToolRailButton("面板", onAddPanel)
+        Spacer(Modifier.height(3.dp))
+        ToolRailButton("多选", onToggleMulti, active = multiSelect)
+        ToolRailButton("画布", onToggleNavigation, active = navigationMode)
+    }
+}
+
+@Composable
+private fun QuickRail(
+    modifier: Modifier = Modifier,
+    hasSelection: Boolean,
+    onLayers: () -> Unit,
+    onPages: () -> Unit,
+    onLibrary: () -> Unit,
+    onProperties: () -> Unit
+) {
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xD9171B22)).padding(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ToolRailButton("图层", onLayers)
+        ToolRailButton("页面", onPages)
+        ToolRailButton("素材", onLibrary)
+        ToolRailButton("属性", onProperties, enabled = hasSelection)
+    }
+}
+
+@Composable
+private fun BoxScope.EditorModeBadge(text: String, color: Color) {
+    Text(
+        text,
+        modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+            .background(color, RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        color = Color.White,
+        fontSize = 11.sp
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoreToolsSheet(
+    safeArea: Boolean,
+    snapping: Boolean,
+    multiSelect: Boolean,
+    navigationMode: Boolean,
+    onDismiss: () -> Unit,
     onToggleSafe: () -> Unit,
     onToggleSnap: () -> Unit,
     onToggleMulti: () -> Unit,
     onToggleNavigation: () -> Unit,
-    onLayers: () -> Unit,
-    onPages: () -> Unit,
-    onLibrary: () -> Unit,
     onSave: () -> Unit,
     onExportJson: () -> Unit,
     onExportProject: () -> Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth().height(60.dp).background(Color(0xFF20242B))
-            .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(projectName, fontWeight = FontWeight.Bold, modifier = Modifier.widthIn(max = 170.dp))
-        TinyButton("撤销", onUndo)
-        TinyButton("重做", onRedo)
-        TinyButton("导入图片", onImport, primary = true)
-        TinyButton("文字", onAddText)
-        TinyButton("按钮", onAddButton)
-        TinyButton("面板", onAddPanel)
-        Box {
-            TinyButton("${preset.label} ▼", onPresetClick)
-            presetMenu()
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF20242B)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)) {
+            Text("编辑器设置", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TinyButton(if (safeArea) "安全区 ✓" else "安全区", onToggleSafe, primary = safeArea)
+                TinyButton(if (snapping) "吸附 ✓" else "吸附", onToggleSnap, primary = snapping)
+                TinyButton(if (multiSelect) "多选 ✓" else "多选", onToggleMulti, primary = multiSelect)
+                TinyButton(if (navigationMode) "画布手势 ✓" else "画布手势", onToggleNavigation, primary = navigationMode)
+            }
+            Spacer(Modifier.height(14.dp))
+            Text("工程", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TinyButton("保存", onSave, primary = true)
+                TinyButton("导出 JSON", onExportJson)
+                TinyButton("导出工程", onExportProject)
+            }
+            Spacer(Modifier.height(22.dp))
         }
-        TinyButton("－", onZoomOut)
-        Text("${(zoom * 100).toInt()}%", fontSize = 12.sp)
-        TinyButton("＋", onZoomIn)
-        TinyButton("适配", onFit)
-        TinyButton(if (safeArea) "安全区✓" else "安全区", onToggleSafe)
-        TinyButton(if (snapping) "吸附✓" else "吸附", onToggleSnap, primary = snapping)
-        TinyButton(if (multiSelect) "多选✓" else "多选", onToggleMulti, primary = multiSelect)
-        TinyButton(if (navigationMode) "画布手势✓" else "画布手势", onToggleNavigation, primary = navigationMode)
-        TinyButton("图层", onLayers)
-        TinyButton("页面", onPages)
-        TinyButton("资源库", onLibrary, primary = true)
-        TinyButton("保存", onSave)
-        TinyButton("导出JSON", onExportJson)
-        TinyButton("导出工程", onExportProject)
     }
 }
 
