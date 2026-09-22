@@ -73,6 +73,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -1000,6 +1001,7 @@ private fun EditorElementView(
                     color = Color(element.textColor).copy(alpha = element.opacity),
                     fontSize = (element.fontSize * renderScale).sp,
                     fontWeight = editorFontWeight(element.fontWeightMode),
+                    fontFamily = editorFontFamily(element.fontFamilyMode),
                     textAlign = editorTextAlign(element.textAlign),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)
                 )
@@ -1010,6 +1012,7 @@ private fun EditorElementView(
                     color = Color(element.textColor),
                     fontSize = (element.fontSize * renderScale).sp,
                     fontWeight = editorFontWeight(element.fontWeightMode),
+                    fontFamily = editorFontFamily(element.fontFamilyMode),
                     textAlign = editorTextAlign(element.textAlign),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 )
@@ -1074,6 +1077,12 @@ private fun editorFontWeight(mode: FontWeightMode): FontWeight = when (mode) {
     FontWeightMode.NORMAL -> FontWeight.Normal
     FontWeightMode.MEDIUM -> FontWeight.Medium
     FontWeightMode.BOLD -> FontWeight.Bold
+}
+
+private fun editorFontFamily(mode: FontFamilyMode): FontFamily = when (mode) {
+    FontFamilyMode.SANS -> FontFamily.SansSerif
+    FontFamilyMode.SERIF -> FontFamily.Serif
+    FontFamilyMode.MONO -> FontFamily.Monospace
 }
 
 private fun editorTextAlign(mode: TextAlignMode): TextAlign = when (mode) {
@@ -1640,6 +1649,18 @@ private fun PropertiesSheet(
                             FontWeightMode.BOLD -> "粗体"
                         }
                         TinyButton(label, { vm.setFontWeight(mode) }, primary = element.fontWeightMode == mode)
+                    }
+                }
+
+                Text("字体", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FontFamilyMode.entries.forEach { mode ->
+                        val label = when (mode) {
+                            FontFamilyMode.SANS -> "无衬线"
+                            FontFamilyMode.SERIF -> "衬线"
+                            FontFamilyMode.MONO -> "等宽"
+                        }
+                        TinyButton(label, { vm.setFontFamily(mode) }, primary = element.fontFamilyMode == mode)
                     }
                 }
 
