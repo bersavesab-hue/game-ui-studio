@@ -1062,6 +1062,44 @@ private fun EditorElementView(
 }
 
 @Composable
+private fun BoxScope.ResizeHandle(
+    alignment: Alignment,
+    offsetX: Int,
+    offsetY: Int,
+    handle: String,
+    elementId: String,
+    renderScale: Float,
+    density: Float,
+    onBegin: () -> Unit,
+    onEnd: () -> Unit,
+    onResizeHandle: (String, Float, Float) -> Unit
+) {
+    Box(
+        Modifier.align(alignment)
+            .offset(offsetX.dp, offsetY.dp)
+            .size(32.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White)
+            .border(4.dp, Color(0xFF2563EB), RoundedCornerShape(50))
+            .pointerInput(elementId, handle, renderScale) {
+                detectDragGestures(
+                    onDragStart = { onBegin() },
+                    onDragEnd = onEnd,
+                    onDragCancel = onEnd,
+                    onDrag = { change, amount ->
+                        change.consume()
+                        onResizeHandle(
+                            handle,
+                            amount.x / density / renderScale,
+                            amount.y / density / renderScale
+                        )
+                    }
+                )
+            }
+    )
+}
+
+@Composable
 private fun RenderImage(element: EditorElement, renderScale: Float, assetsRoot: File) {
     val density = LocalDensity.current.density
     val bitmap = remember(element.assetPath) {
@@ -1250,6 +1288,48 @@ private fun SelectedToolBar(
         }
         if (selectedCount == 1) TinyButton("属性/适配", onProperties, primary = true)
         if (multiSelect) TinyButton("完成多选", onFinishMulti, primary = true)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickActionSheet(
+    element: EditorElement,
+    cropMode: Boolean,
+    onDismiss: () -> Unit,
+    onCrop: () -> Unit,
+    onDuplicate: () -> Unit,
+    onFront: () -> Unit,
+    onBack: () -> Unit,
+    onLock: () -> Unit,
+    onProperties: () -> Unit,
+    onDelete: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF20242B)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp)) {
+            Text(element.name, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "长按快捷操作",
+                fontSize = 11.sp,
+                color = Color(0xFF9CA3AF),
+                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+            )
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (element.type == ElementType.IMAGE && !element.isBackground) {
+                    TinyButton(if (cropMode) "继续裁剪" else "裁剪图片", onCrop, primary = true)
+                }
+                TinyButton("属性/适配", onProperties, primary = true)
+                TinyButton("复制", onDuplicate)
+                TinyButton("置顶", onFront)
+                TinyButton("置底", onBack)
+                TinyButton(if (element.locked) "解锁" else "锁定", onLock)
+                TinyButton("删除", onDelete)
+            }
+            Spacer(Modifier.height(22.dp))
+        }
     }
 }
 
