@@ -724,15 +724,39 @@ private fun CanvasWorkspace(
                     .border(1.dp, Color(0xFF646B75), RoundedCornerShape(10.dp))
             ) {
                 if (showSafeArea) {
-                    val marginX = preset.width * 0.04f * renderScale
-                    val marginY = preset.height * 0.06f * renderScale
-                    Box(
-                        Modifier.offset(marginX.dp, marginY.dp)
-                            .requiredSize(
-                                (preset.width * renderScale - marginX * 2).dp,
-                                (preset.height * renderScale - marginY * 2).dp
+                    val safe = deviceSafeRect(preset.width, preset.height)
+                    val core = core916Rect(preset.width, preset.height)
+
+                    if (kotlin.math.abs(core.width - preset.width) > 1f || kotlin.math.abs(core.height - preset.height) > 1f) {
+                        Box(
+                            Modifier.offset((core.left * renderScale).dp, (core.top * renderScale).dp)
+                                .requiredSize((core.width * renderScale).dp, (core.height * renderScale).dp)
+                                .border(2.dp, Color(0xFFF59E0B), RoundedCornerShape(8.dp))
+                        )
+                        Text(
+                            "9:16 核心区",
+                            color = Color(0xFFF59E0B),
+                            fontSize = 10.sp,
+                            modifier = Modifier.offset(
+                                (core.left * renderScale + 8f).dp,
+                                (core.top * renderScale + 6f).dp
                             )
-                            .border(2.dp, Color(0xFF0F766E), RoundedCornerShape(8.dp))
+                        )
+                    }
+
+                    Box(
+                        Modifier.offset((safe.left * renderScale).dp, (safe.top * renderScale).dp)
+                            .requiredSize((safe.width * renderScale).dp, (safe.height * renderScale).dp)
+                            .border(2.dp, Color(0xFF10B981), RoundedCornerShape(8.dp))
+                    )
+                    Text(
+                        "系统安全区",
+                        color = Color(0xFF10B981),
+                        fontSize = 10.sp,
+                        modifier = Modifier.offset(
+                            (safe.left * renderScale + 8f).dp,
+                            (safe.top * renderScale + 6f).dp
+                        )
                     )
                 }
 
