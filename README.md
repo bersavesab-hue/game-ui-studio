@@ -79,3 +79,7 @@ GitHub Actions 已配置 `.github/workflows/android-build.yml`。推送到 `main
 `app/build/outputs/apk/debug/app-debug.apk`
 
 也可以在 Android Studio 中直接打开根目录运行。
+
+## 下一阶段
+
+v0.5.0：组件命名与缩略图、属性数值直接编辑、颜色/字体样式、背景专用适配、工程导入恢复、PNG 预览导出，以及触屏操作细节收尾。
