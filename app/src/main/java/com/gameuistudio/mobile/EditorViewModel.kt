@@ -66,7 +66,45 @@ class EditorViewModel : ViewModel() {
     val currentPage: EditorPage?
         get() = currentPageId?.let { id -> pages.firstOrNull { it.id == id } }
 
+    private fun migratePortraitProject(project: ProjectData?): ProjectData? {
+        if (sourceProject == null) return null
+        if (project.designWidth <= project.designHeight) return project
+
+        val sx = DESIGN_WIDTH / project.designWidth.coerceAtLeast(1f)
+        val sy = DESIGN_HEIGHT / project.designHeight.coerceAtLeast(1f)
+
+        fun migrateElement(e: EditorElement): EditorElement = e.copy(
+            x = (e.x * sx).coerceIn(0f, DESIGN_WIDTH),
+            y = (e.y * sy).coerceIn(0f, DESIGN_HEIGHT),
+            width = (e.width * sx).coerceIn(40f, DESIGN_WIDTH),
+            height = (e.height * sy).coerceIn(40f, DESIGN_HEIGHT),
+            fontSize = (e.fontSize * min(sx, sy)).coerceAtLeast(12f),
+            cornerRadius = e.cornerRadius * min(sx, sy),
+            cropOffsetX = e.cropOffsetX * sx,
+            cropOffsetY = e.cropOffsetY * sy
+        )
+
+        return project.copy(
+            version = 4,
+            designWidth = DESIGN_WIDTH,
+            designHeight = DESIGN_HEIGHT,
+            pages = sourceProject.pages.map { page -> page.copy(elements = page.elements.map(::migrateElement)) },
+            components = project.components.map { component ->
+                component.copy(
+                    width = component.width * sx,
+                    height = component.height * sy,
+                    elements = component.elements.map(::migrateElement)
+                )
+            },
+            pageTemplates = project.pageTemplates.map { template ->
+                template.copy(elements = template.elements.map(::migrateElement))
+            },
+            elements = sourceProject.elements.map(::migrateElement)
+        )
+    }
+
     fun loadProject(project: ProjectData?) {
+        val sourceProject = migratePortraitProject(project)
         elements.clear()
         pages.clear()
         assetLibrary.clear()
@@ -75,12 +113,12 @@ class EditorViewModel : ViewModel() {
         selectedIds.clear()
         activeGroupEditId = null
 
-        projectName = project?.projectName ?: "未命名 UI 工程"
+        projectName = sourceProject?.projectName ?: "未命名 UI 工程"
         val loadedPages = when {
-            project == null -> emptyList()
-            project.pages.isNotEmpty() -> project.pages
-            project.elements.isNotEmpty() -> listOf(
-                EditorPage(UUID.randomUUID().toString(), "页面 1", project.elements.sortedBy { it.zIndex })
+            sourceProject == null -> emptyList()
+            sourceProject.pages.isNotEmpty() -> sourceProject.pages
+            sourceProject.elements.isNotEmpty() -> listOf(
+                EditorPage(UUID.randomUUID().toString(), "页面 1", sourceProject.elements.sortedBy { it.zIndex })
             )
             else -> emptyList()
         }
@@ -90,19 +128,19 @@ class EditorViewModel : ViewModel() {
             pages.addAll(loadedPages)
         }
 
-        currentPageId = project?.currentPageId?.takeIf { wanted -> pages.any { it.id == wanted } } ?: pages.first().id
+        currentPageId = sourceProject?.currentPageId?.takeIf { wanted -> pages.any { it.id == wanted } } ?: pages.first().id
 
-        val loadedAssets = project?.assetLibrary.orEmpty()
+        val loadedAssets = sourceProject?.assetLibrary.orEmpty()
         if (loadedAssets.isNotEmpty()) {
             assetLibrary.addAll(loadedAssets)
         } else {
-            val derived = (project?.allElements().orEmpty()).filter { it.type == ElementType.IMAGE && it.assetPath != null }
+            val derived = (sourceProject?.allElements().orEmpty()).filter { it.type == ElementType.IMAGE && it.assetPath != null }
                 .distinctBy { it.assetPath }
                 .map { e -> AssetRecord(e.assetId ?: UUID.randomUUID().toString(), e.name, e.assetPath!!, (e.width / e.height.coerceAtLeast(1f)).coerceAtLeast(0.05f)) }
             assetLibrary.addAll(derived)
         }
-        components.addAll(project?.components.orEmpty())
-        pageTemplates.addAll(project?.pageTemplates.orEmpty())
+        components.addAll(sourceProject?.components.orEmpty())
+        pageTemplates.addAll(sourceProject?.pageTemplates.orEmpty())
         loadActivePageElements()
         undoStack.clear()
         redoStack.clear()
@@ -113,7 +151,7 @@ class EditorViewModel : ViewModel() {
     fun toProject(): ProjectData {
         syncCurrentPage()
         return ProjectData(
-            version = 3,
+            version = 4,
             projectName = projectName,
             pages = pages.toList(),
             currentPageId = currentPageId,
