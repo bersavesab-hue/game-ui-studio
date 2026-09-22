@@ -431,6 +431,8 @@ private fun PortraitBottomDock(
     onImport: () -> Unit,
     onAddText: () -> Unit,
     onAddButton: () -> Unit,
+    navigationMode: Boolean,
+    onToggleNavigation: () -> Unit,
     onPages: () -> Unit,
     onLayers: () -> Unit,
     onMore: () -> Unit
@@ -438,13 +440,14 @@ private fun PortraitBottomDock(
     Row(
         modifier.fillMaxWidth().height(56.dp)
             .background(Color(0xFF171B22))
-            .padding(horizontal = 4.dp, vertical = 5.dp),
+            .padding(horizontal = 2.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         PortraitDockButton("图片", onImport, primary = true)
         PortraitDockButton("文字", onAddText)
         PortraitDockButton("按钮", onAddButton)
+        PortraitDockButton("画布", onToggleNavigation, primary = navigationMode)
         PortraitDockButton("页面", onPages)
         PortraitDockButton("图层", onLayers)
         PortraitDockButton("更多", onMore)
@@ -459,7 +462,7 @@ private fun PortraitDockButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = Modifier.height(44.dp).width(56.dp),
+        modifier = Modifier.height(44.dp).width(48.dp),
         shape = RoundedCornerShape(11.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (primary) Color(0xFF2563EB) else Color(0xFF282E37)
@@ -718,7 +721,8 @@ private fun CanvasWorkspace(
     cropMode: Boolean,
     navigationMode: Boolean,
     assetsRoot: File,
-    onCanvasZoomChange: (Float) -> Unit
+    onCanvasZoomChange: (Float) -> Unit,
+    onElementLongPress: (String) -> Unit
 ) {
     val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
@@ -738,17 +742,29 @@ private fun CanvasWorkspace(
         val canvasH = (preset.height * renderScale).dp
 
         val navigationModifier = if (navigationMode) {
-            Modifier.pointerInput(preset.label, navigationMode) {
-                var gestureZoom = canvasZoom
-                detectTransformGestures { _, pan, zoom, _ ->
-                    gestureZoom = (gestureZoom * zoom).coerceIn(0.35f, 3f)
-                    onCanvasZoomChange(gestureZoom)
-                    scope.launch {
-                        hScroll.scrollBy(-pan.x)
-                        vScroll.scrollBy(-pan.y)
+            Modifier
+                .pointerInput(preset.label, navigationMode, canvasZoom) {
+                    var gestureZoom = canvasZoom
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        gestureZoom = (gestureZoom * zoom).coerceIn(0.35f, 3f)
+                        onCanvasZoomChange(gestureZoom)
+                        scope.launch {
+                            hScroll.scrollBy(-pan.x)
+                            vScroll.scrollBy(-pan.y)
+                        }
                     }
                 }
-            }
+                .pointerInput(preset.label, "doubleTapFit") {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            onCanvasZoomChange(1f)
+                            scope.launch {
+                                hScroll.animateScrollTo(0)
+                                vScroll.animateScrollTo(0)
+                            }
+                        }
+                    )
+                }
         } else Modifier
 
         Box(
@@ -825,10 +841,19 @@ private fun CanvasWorkspace(
                         cropMode = cropMode && vm.selectedId == element.id && element.type == ElementType.IMAGE,
                         assetsRoot = assetsRoot,
                         onSelect = { vm.selectElement(element.id) },
+                        onLongPress = { onElementLongPress(element.id) },
                         onBegin = vm::beginTransaction,
                         onEnd = vm::endTransaction,
                         onMove = { dx, dy -> vm.moveTransient(element.id, dx, dy) },
-                        onResize = { dw, dh -> vm.resizeTransient(element.id, dw, dh, keepRatio = element.type == ElementType.IMAGE) },
+                        onResizeHandle = { handle, dx, dy ->
+                            vm.resizeFromHandleTransient(
+                                element.id,
+                                handle,
+                                dx,
+                                dy,
+                                keepRatio = element.type == ElementType.IMAGE
+                            )
+                        },
                         onCrop = { panX, panY, zoom, rotation -> vm.updateCropTransient(element.id, panX, panY, zoom, rotation) }
                     )
                 }
@@ -923,10 +948,11 @@ private fun EditorElementView(
     cropMode: Boolean,
     assetsRoot: File,
     onSelect: () -> Unit,
+    onLongPress: () -> Unit,
     onBegin: () -> Unit,
     onEnd: () -> Unit,
     onMove: (Float, Float) -> Unit,
-    onResize: (Float, Float) -> Unit,
+    onResizeHandle: (String, Float, Float) -> Unit,
     onCrop: (Float, Float, Float, Float) -> Unit
 ) {
     val density = LocalDensity.current.density
@@ -935,7 +961,12 @@ private fun EditorElementView(
         .offset((rect.x * renderScale).dp, (rect.y * renderScale).dp)
         .requiredSize((rect.width * renderScale).dp, (rect.height * renderScale).dp)
         .then(if (selected) Modifier.border(2.dp, borderColor) else Modifier)
-        .clickable { onSelect() }
+        .pointerInput(element.id, selected) {
+            detectTapGestures(
+                onTap = { onSelect() },
+                onLongPress = { onSelect(); onLongPress() }
+            )
+        }
         .pointerInput(element.id, editable, cropMode, renderScale) {
             if (!editable || element.locked) return@pointerInput
             if (cropMode && element.type == ElementType.IMAGE) {
@@ -977,22 +1008,54 @@ private fun EditorElementView(
             )
         }
 
-        if (selected && singleSelection && editable && !element.locked && !cropMode) {
-            Box(
-                Modifier.align(Alignment.BottomEnd).offset(10.dp, 10.dp).size(24.dp)
-                    .clip(RoundedCornerShape(50)).background(Color.White)
-                    .border(4.dp, Color(0xFF2563EB), RoundedCornerShape(50))
-                    .pointerInput(element.id, renderScale) {
-                        detectDragGestures(
-                            onDragStart = { onBegin() },
-                            onDragEnd = onEnd,
-                            onDragCancel = onEnd,
-                            onDrag = { change, amount ->
-                                change.consume()
-                                onResize(amount.x / density / renderScale, amount.y / density / renderScale)
-                            }
-                        )
-                    }
+        if (selected && singleSelection && editable && !element.locked && !element.isBackground && !cropMode) {
+            ResizeHandle(
+                alignment = Alignment.TopStart,
+                offsetX = -12,
+                offsetY = -12,
+                handle = "tl",
+                elementId = element.id,
+                renderScale = renderScale,
+                density = density,
+                onBegin = onBegin,
+                onEnd = onEnd,
+                onResizeHandle = onResizeHandle
+            )
+            ResizeHandle(
+                alignment = Alignment.TopEnd,
+                offsetX = 12,
+                offsetY = -12,
+                handle = "tr",
+                elementId = element.id,
+                renderScale = renderScale,
+                density = density,
+                onBegin = onBegin,
+                onEnd = onEnd,
+                onResizeHandle = onResizeHandle
+            )
+            ResizeHandle(
+                alignment = Alignment.BottomStart,
+                offsetX = -12,
+                offsetY = 12,
+                handle = "bl",
+                elementId = element.id,
+                renderScale = renderScale,
+                density = density,
+                onBegin = onBegin,
+                onEnd = onEnd,
+                onResizeHandle = onResizeHandle
+            )
+            ResizeHandle(
+                alignment = Alignment.BottomEnd,
+                offsetX = 12,
+                offsetY = 12,
+                handle = "br",
+                elementId = element.id,
+                renderScale = renderScale,
+                density = density,
+                onBegin = onBegin,
+                onEnd = onEnd,
+                onResizeHandle = onResizeHandle
             )
         }
     }
