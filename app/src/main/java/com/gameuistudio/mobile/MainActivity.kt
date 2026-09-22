@@ -117,6 +117,8 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var showAdaptation by remember { mutableStateOf(false) }
     var showQuickActions by remember { mutableStateOf(false) }
     var showBatchSize by remember { mutableStateOf(false) }
+    var apkResult by remember { mutableStateOf<ApkInspectionResult?>(null) }
+    var showApkImport by remember { mutableStateOf(false) }
     var customPreset by remember { mutableStateOf<PreviewPreset?>(null) }
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
@@ -137,6 +139,17 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                     options.outWidth.toFloat() / options.outHeight
                 } else 9f / 16f
                 vm.addImage(relative, name, ratio)
+            }
+        }
+    }
+
+    val apkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                ApkInspector.inspect(context, uri)
+            }.onSuccess {
+                apkResult = it
+                showApkImport = true
             }
         }
     }
@@ -318,6 +331,10 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             onDismiss = { showMoreTools = false },
             onAddPanel = vm::addPanel,
             onLibrary = { showMoreTools = false; showLibrary = true },
+            onApkImport = {
+                showMoreTools = false
+                apkLauncher.launch(arrayOf("application/vnd.android.package-archive", "application/octet-stream"))
+            },
             onAdaptation = { showMoreTools = false; showAdaptation = true },
             onToggleSafe = { showSafeArea = !showSafeArea },
             onToggleSnap = vm::toggleSnapping,
@@ -366,6 +383,41 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             onApply = { width, height ->
                 vm.resizeSelectionTo(width, height)
                 showBatchSize = false
+            }
+        )
+    }
+
+
+    val currentApkResult = apkResult
+    if (showApkImport && currentApkResult != null) {
+        ApkImportSheet(
+            result = currentApkResult,
+            onDismiss = { showApkImport = false },
+            onImportImages = {
+                currentApkResult.resources
+                    .filter { it.category == "image" }
+                    .forEach { resource ->
+                        runCatching {
+                            val source = File(resource.extractedPath)
+                            val relative = ProjectStorage.importFileAsset(context, source, source.name)
+                            val target = ProjectStorage.assetFile(context, relative)
+                            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeFile(target.absolutePath, options)
+                            val ratio = if (options.outWidth > 0 && options.outHeight > 0) {
+                                options.outWidth.toFloat() / options.outHeight
+                            } else 1f
+                            vm.registerImportedAsset(relative, source.name, ratio)
+                        }
+                    }
+                ProjectStorage.save(context, vm.toProject())
+            },
+            onCreateRebuildPage = {
+                vm.createApkRebuildPage("APK 重建 · ${currentApkResult.fileName.substringBeforeLast('.')}")
+                showApkImport = false
+            },
+            onOpenLibrary = {
+                showApkImport = false
+                showLibrary = true
             }
         )
     }
@@ -654,6 +706,7 @@ private fun MoreToolsSheet(
     onDismiss: () -> Unit,
     onAddPanel: () -> Unit,
     onLibrary: () -> Unit,
+    onApkImport: () -> Unit,
     onAdaptation: () -> Unit,
     onToggleSafe: () -> Unit,
     onToggleSnap: () -> Unit,
@@ -673,6 +726,7 @@ private fun MoreToolsSheet(
             ) {
                 TinyButton("添加面板", onAddPanel, primary = true)
                 TinyButton("素材库", onLibrary)
+                TinyButton("APK 拆解", onApkImport, primary = true)
                 TinyButton("适配检查", onAdaptation, primary = true)
             }
             Spacer(Modifier.height(14.dp))
