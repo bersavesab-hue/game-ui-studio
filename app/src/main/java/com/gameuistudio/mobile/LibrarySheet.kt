@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -245,7 +246,7 @@ private fun MiniLayoutPreview(
         modifier.background(Color(0xFF111318), RoundedCornerShape(8.dp))
             .border(1.dp, Color(0xFF46505D), RoundedCornerShape(8.dp))
     ) {
-        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(84.dp)) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
             val scale = kotlin.math.min(maxWidth.value / safeW, maxHeight.value / safeH)
             elements.sortedBy { it.zIndex }.filterNot { it.hidden }.forEach { e ->
                 val color = when (e.type) {
