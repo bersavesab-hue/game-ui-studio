@@ -489,15 +489,30 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     if (showWebCapture && currentApkResult != null) {
         WebUiCaptureSheet(
             result = currentApkResult,
-            onDismiss = { showWebCapture = false },
+            onDismiss = {
+                showWebCapture = false
+                presetIndex = 0
+                customPreset = null
+                canvasZoom = 1f
+            },
             onCaptured = { capture ->
                 val rebuild = WebUiCapture.buildRebuildData(context, currentApkResult, capture)
                 vm.importWebRebuild(rebuild)
                 ProjectStorage.save(context, vm.toProject())
-                presetIndex = 0
-                customPreset = null
-                canvasZoom = 1f
-                showWebCapture = false
+            },
+            onReferenceCaptured = { source ->
+                runCatching {
+                    val relative = ProjectStorage.importFileAsset(context, source, source.name)
+                    val target = ProjectStorage.assetFile(context, relative)
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(target.absolutePath, options)
+                    val ratio = if (options.outWidth > 0 && options.outHeight > 0) {
+                        options.outWidth.toFloat() / options.outHeight
+                    } else 9f / 16f
+                    vm.addReferenceBackground(relative, source.name, ratio)
+                    ProjectStorage.save(context, vm.toProject())
+                }
+                source.delete()
             }
         )
     }
