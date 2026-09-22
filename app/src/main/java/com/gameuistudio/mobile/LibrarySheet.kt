@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -20,9 +21,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +41,12 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibrarySheet(vm: EditorViewModel, projectRoot: File, onDismiss: () -> Unit) {
+    var componentName by remember { mutableStateOf("") }
+    var templateName by remember { mutableStateOf("") }
+    var renameComponentId by remember { mutableStateOf<String?>(null) }
+    var renameTemplateId by remember { mutableStateOf<String?>(null) }
+    var renameText by remember { mutableStateOf("") }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF20242B)
@@ -99,8 +110,18 @@ fun LibrarySheet(vm: EditorViewModel, projectRoot: File, onDismiss: () -> Unit) 
 
             Spacer(Modifier.height(18.dp))
             SectionTitle("组件", "${vm.components.size} 个")
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                LibraryButton("把当前选择保存为组件", primary = true) { vm.saveSelectionAsComponent() }
+            OutlinedTextField(
+                value = componentName,
+                onValueChange = { componentName = it.take(30) },
+                label = { Text("组件名称（可选）") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+                LibraryButton("保存当前选择", primary = true) {
+                    vm.saveSelectionAsComponent(componentName)
+                    componentName = ""
+                }
             }
             Spacer(Modifier.height(6.dp))
             if (vm.components.isEmpty()) {
@@ -113,7 +134,13 @@ fun LibrarySheet(vm: EditorViewModel, projectRoot: File, onDismiss: () -> Unit) 
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(Modifier.weight(1f)) {
+                        MiniLayoutPreview(
+                            elements = component.elements,
+                            sourceWidth = component.width,
+                            sourceHeight = component.height,
+                            modifier = Modifier.size(54.dp, 72.dp)
+                        )
+                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
                             Text(component.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Text(
                                 "${component.elements.size} 个元素 · ${component.width.toInt()}×${component.height.toInt()}",
@@ -123,14 +150,40 @@ fun LibrarySheet(vm: EditorViewModel, projectRoot: File, onDismiss: () -> Unit) 
                         }
                         LibraryButton("插入") { vm.insertComponent(component.id) }
                         Spacer(Modifier.size(4.dp))
+                        LibraryButton("改名") {
+                            renameComponentId = component.id
+                            renameTemplateId = null
+                            renameText = component.name
+                        }
+                        Spacer(Modifier.size(4.dp))
                         LibraryButton("删除", danger = true) { vm.deleteComponent(component.id) }
+                    }
+                    if (renameComponentId == component.id) {
+                        RenameRow(
+                            value = renameText,
+                            onChange = { renameText = it },
+                            onApply = {
+                                vm.renameComponent(component.id, renameText)
+                                renameComponentId = null
+                            }
+                        )
                     }
                 }
             }
 
             Spacer(Modifier.height(18.dp))
             SectionTitle("页面模板", "${vm.pageTemplates.size} 个")
-            LibraryButton("保存当前页为模板", primary = true) { vm.saveCurrentPageAsTemplate() }
+            OutlinedTextField(
+                value = templateName,
+                onValueChange = { templateName = it.take(30) },
+                label = { Text("模板名称（可选）") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+            )
+            LibraryButton("保存当前页为模板", primary = true) {
+                vm.saveCurrentPageAsTemplate(templateName)
+                templateName = ""
+            }
             Spacer(Modifier.height(6.dp))
             if (vm.pageTemplates.isEmpty()) {
                 EmptyLibraryBox("可把已完成页面保存为模板，再一键生成新页面")
@@ -142,13 +195,35 @@ fun LibrarySheet(vm: EditorViewModel, projectRoot: File, onDismiss: () -> Unit) 
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(Modifier.weight(1f)) {
+                        MiniLayoutPreview(
+                            elements = template.elements,
+                            sourceWidth = DESIGN_WIDTH,
+                            sourceHeight = DESIGN_HEIGHT,
+                            modifier = Modifier.size(54.dp, 84.dp)
+                        )
+                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
                             Text(template.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             Text("${template.elements.size} 个元素", fontSize = 9.sp, color = Color(0xFF9CA3AF))
                         }
                         LibraryButton("新建页面") { vm.createPageFromTemplate(template.id) }
                         Spacer(Modifier.size(4.dp))
+                        LibraryButton("改名") {
+                            renameTemplateId = template.id
+                            renameComponentId = null
+                            renameText = template.name
+                        }
+                        Spacer(Modifier.size(4.dp))
                         LibraryButton("删除", danger = true) { vm.deletePageTemplate(template.id) }
+                    }
+                    if (renameTemplateId == template.id) {
+                        RenameRow(
+                            value = renameText,
+                            onChange = { renameText = it },
+                            onApply = {
+                                vm.renamePageTemplate(template.id, renameText)
+                                renameTemplateId = null
+                            }
+                        )
                     }
                 }
             }
