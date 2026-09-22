@@ -991,23 +991,30 @@ private fun EditorElementView(
     Box(baseModifier, contentAlignment = Alignment.Center) {
         when (element.type) {
             ElementType.IMAGE -> RenderImage(element, renderScale, assetsRoot)
-            ElementType.TEXT -> Text(
-                element.text,
-                color = Color(0xFF111318),
-                fontSize = (element.fontSize * renderScale).sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            ElementType.BUTTON -> Box(
-                Modifier.fillMaxSize().clip(RoundedCornerShape((element.cornerRadius * renderScale).dp))
-                    .background(Color(0xFF2563EB)),
-                contentAlignment = Alignment.Center
+            ElementType.TEXT -> Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = editorAlignment(element.textAlign)
             ) {
-                Text(element.text, color = Color.White, fontSize = (element.fontSize * renderScale).sp)
+                Text(
+                    text = element.text,
+                    color = Color(element.textColor).copy(alpha = element.opacity),
+                    fontSize = (element.fontSize * renderScale).sp,
+                    fontWeight = editorFontWeight(element.fontWeightMode),
+                    textAlign = editorTextAlign(element.textAlign),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)
+                )
             }
-            ElementType.PANEL -> Box(
-                Modifier.fillMaxSize().clip(RoundedCornerShape((element.cornerRadius * renderScale).dp))
-                    .background(Color(0xFFCBD5E1).copy(alpha = element.opacity))
-            )
+            ElementType.BUTTON -> StyledElementSurface(element, renderScale) {
+                Text(
+                    text = element.text,
+                    color = Color(element.textColor),
+                    fontSize = (element.fontSize * renderScale).sp,
+                    fontWeight = editorFontWeight(element.fontWeightMode),
+                    textAlign = editorTextAlign(element.textAlign),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                )
+            }
+            ElementType.PANEL -> StyledElementSurface(element, renderScale) {}
         }
 
         if (selected && singleSelection && editable && !element.locked && !element.isBackground && !cropMode) {
