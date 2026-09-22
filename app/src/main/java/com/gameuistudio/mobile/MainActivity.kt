@@ -1559,6 +1559,34 @@ private fun PropertiesSheet(
                 fontSize = 12.sp, color = Color(0xFFB6BDC8)
             )
 
+            var xText by remember(element.id, element.x) { mutableStateOf(element.x.toInt().toString()) }
+            var yText by remember(element.id, element.y) { mutableStateOf(element.y.toInt().toString()) }
+            var wText by remember(element.id, element.width) { mutableStateOf(element.width.toInt().toString()) }
+            var hText by remember(element.id, element.height) { mutableStateOf(element.height.toInt().toString()) }
+
+            Spacer(Modifier.height(12.dp))
+            Text("精确位置与尺寸", fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CompactNumberField("X", xText, { xText = it }, Modifier.weight(1f))
+                CompactNumberField("Y", yText, { yText = it }, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+                CompactNumberField("宽", wText, { wText = it }, Modifier.weight(1f))
+                CompactNumberField("高", hText, { hText = it }, Modifier.weight(1f))
+            }
+            TinyButton(
+                "应用坐标/尺寸",
+                {
+                    vm.updateGeometry(
+                        x = xText.toFloatOrNull(),
+                        y = yText.toFloatOrNull(),
+                        width = wText.toFloatOrNull(),
+                        height = hText.toFloatOrNull()
+                    )
+                },
+                primary = true
+            )
+
             Spacer(Modifier.height(14.dp))
             Text("快速对齐画布", fontWeight = FontWeight.Bold)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1579,6 +1607,88 @@ private fun PropertiesSheet(
             ModeRow(element.widthMode, onWidthMode)
             Text("高度适配", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             ModeRow(element.heightMode, onHeightMode)
+
+            if (element.type == ElementType.TEXT || element.type == ElementType.BUTTON) {
+                Spacer(Modifier.height(18.dp))
+                Text("文字", fontWeight = FontWeight.Bold)
+                var textValue by remember(element.id, element.text) { mutableStateOf(element.text) }
+                var fontSizeText by remember(element.id, element.fontSize) { mutableStateOf(element.fontSize.toInt().toString()) }
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = { textValue = it },
+                    label = { Text("内容") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CompactNumberField("字号", fontSizeText, { fontSizeText = it }, Modifier.weight(1f))
+                    TinyButton("应用文字", {
+                        vm.setText(textValue)
+                        fontSizeText.toFloatOrNull()?.let(vm::setFontSize)
+                    }, primary = true)
+                }
+
+                Text("字重", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FontWeightMode.entries.forEach { mode ->
+                        val label = when (mode) {
+                            FontWeightMode.NORMAL -> "常规"
+                            FontWeightMode.MEDIUM -> "中等"
+                            FontWeightMode.BOLD -> "粗体"
+                        }
+                        TinyButton(label, { vm.setFontWeight(mode) }, primary = element.fontWeightMode == mode)
+                    }
+                }
+
+                Text("对齐", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextAlignMode.entries.forEach { mode ->
+                        val label = when (mode) {
+                            TextAlignMode.LEFT -> "左"
+                            TextAlignMode.CENTER -> "居中"
+                            TextAlignMode.RIGHT -> "右"
+                        }
+                        TinyButton(label, { vm.setTextAlign(mode) }, primary = element.textAlign == mode)
+                    }
+                }
+                ColorHexEditor("文字颜色", element.textColor, vm::setTextColor)
+            }
+
+            if (element.type == ElementType.BUTTON || element.type == ElementType.PANEL) {
+                Spacer(Modifier.height(18.dp))
+                Text("外观", fontWeight = FontWeight.Bold)
+                ColorHexEditor("填充颜色", element.fillColor, vm::setFillColor)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    TinyButton(
+                        if (element.gradientEnabled) "渐变 ✓" else "渐变",
+                        vm::toggleGradient,
+                        primary = element.gradientEnabled
+                    )
+                }
+                if (element.gradientEnabled) {
+                    ColorHexEditor("渐变终点", element.gradientEndColor, vm::setGradientEndColor)
+                }
+                ColorHexEditor("边框颜色", element.borderColor, vm::setBorderColor)
+
+                ImageStyleSlider("圆角", element.cornerRadius, 0f..240f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(radius = it) }, vm::endTransaction)
+                ImageStyleSlider("透明度", element.opacity, 0f..1f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(opacity = it) }, vm::endTransaction)
+                ImageStyleSlider("边框粗细", element.borderWidth, 0f..40f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(borderWidth = it) }, vm::endTransaction)
+                ImageStyleSlider("阴影强度", element.shadowAlpha, 0f..1f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(shadowAlpha = it) }, vm::endTransaction)
+                ImageStyleSlider("阴影大小", element.shadowRadius, 0f..80f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(shadowRadius = it) }, vm::endTransaction)
+                ImageStyleSlider("阴影下移", element.shadowOffsetY, -80f..80f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(shadowOffsetY = it) }, vm::endTransaction)
+            } else if (element.type == ElementType.TEXT) {
+                ImageStyleSlider("文字透明度", element.opacity, 0f..1f, vm::beginTransaction,
+                    { vm.updateVisualStyleTransient(opacity = it) }, vm::endTransaction)
+            }
 
             if (element.type == ElementType.IMAGE) {
                 Spacer(Modifier.height(18.dp))
