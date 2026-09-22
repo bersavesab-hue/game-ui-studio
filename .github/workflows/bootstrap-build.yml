@@ -8,39 +8,28 @@ on:
       - 'bootstrap/**'
       - '.github/workflows/bootstrap-build.yml'
 
-permissions:
-  contents: write
-
 jobs:
-  bootstrap-and-build:
+  build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Reconstruct source archive
+      - name: Reconstruct v0.4.0 source
         shell: bash
         run: |
-          cat bootstrap/source.part00 bootstrap/source.part01 bootstrap/source.part02 bootstrap/source.part03 bootstrap/source.part04 bootstrap/source.part05 bootstrap/source.part06 > source.b64
-          base64 --decode source.b64 > source.zip
-          unzip -q source.zip -d extracted
-          test -f extracted/game-ui-studio/app/build.gradle.kts
-
-      - name: Promote source into repository
-        shell: bash
-        run: |
-          shopt -s dotglob
-          cp -a extracted/game-ui-studio/. .
-          rm -rf bootstrap extracted source.b64 source.zip
-          rm -f .github/workflows/bootstrap-build.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "build: promote Android source v0.4.0"
-            git push origin HEAD:main
-          fi
+          set -euo pipefail
+          cat bootstrap/source.part00 bootstrap/source.part01 bootstrap/source.part02 bootstrap/source.part03 bootstrap/source.part04 bootstrap/source.part05 bootstrap/source.part06 > "$RUNNER_TEMP/source.b64"
+          base64 --decode "$RUNNER_TEMP/source.b64" > "$RUNNER_TEMP/source.zip"
+          unzip -t "$RUNNER_TEMP/source.zip"
+          mkdir -p "$RUNNER_TEMP/unpack"
+          unzip -q "$RUNNER_TEMP/source.zip" -d "$RUNNER_TEMP/unpack"
+          SRC="$RUNNER_TEMP/unpack/game-ui-studio"
+          test -f "$SRC/app/build.gradle.kts"
+          cp -a "$SRC"/. ./
+          # Keep the currently executing bootstrap workflow; do not push from CI.
+          rm -rf bootstrap
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -64,6 +53,9 @@ jobs:
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
