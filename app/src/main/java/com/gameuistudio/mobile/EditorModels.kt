@@ -22,6 +22,12 @@ enum class SizeMode { FIXED, PERCENT, STRETCH }
 enum class ImageFit { COVER, CONTAIN, FILL, FIT_WIDTH, FIT_HEIGHT }
 
 @Serializable
+enum class TextAlignMode { LEFT, CENTER, RIGHT }
+
+@Serializable
+enum class FontWeightMode { NORMAL, MEDIUM, BOLD }
+
+@Serializable
 data class EditorElement(
     val id: String,
     val type: ElementType,
@@ -53,7 +59,18 @@ data class EditorElement(
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val isBackground: Boolean = false,
-    val imageFit: ImageFit = ImageFit.COVER
+    val imageFit: ImageFit = ImageFit.COVER,
+    val fillColor: Int = 0xFF2563EB.toInt(),
+    val gradientEnabled: Boolean = false,
+    val gradientEndColor: Int = 0xFF0F766E.toInt(),
+    val textColor: Int = 0xFFFFFFFF.toInt(),
+    val borderColor: Int = 0xFFFFFFFF.toInt(),
+    val borderWidth: Float = 0f,
+    val shadowAlpha: Float = 0f,
+    val shadowRadius: Float = 0f,
+    val shadowOffsetY: Float = 0f,
+    val textAlign: TextAlignMode = TextAlignMode.CENTER,
+    val fontWeightMode: FontWeightMode = FontWeightMode.MEDIUM
 )
 
 @Serializable
@@ -89,7 +106,7 @@ data class PageTemplate(
 
 @Serializable
 data class ProjectData(
-    val version: Int = 5,
+    val version: Int = 6,
     val projectName: String = "未命名 UI 工程",
     val designWidth: Float = DESIGN_WIDTH,
     val designHeight: Float = DESIGN_HEIGHT,
