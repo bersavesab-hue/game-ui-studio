@@ -1430,6 +1430,46 @@ private fun SelectedToolBar(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun BatchSizeSheet(
+    selectedCount: Int,
+    reference: EditorElement?,
+    onDismiss: () -> Unit,
+    onApply: (Float?, Float?) -> Unit
+) {
+    var widthText by remember(reference?.width) {
+        mutableStateOf(reference?.width?.toInt()?.toString() ?: "")
+    }
+    var heightText by remember(reference?.height) {
+        mutableStateOf(reference?.height?.toInt()?.toString() ?: "")
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF20242B)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp)) {
+            Text("批量修改尺寸", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "已选 $selectedCount 个元素。留空某一项表示保持原值。",
+                fontSize = 11.sp,
+                color = Color(0xFF9CA3AF),
+                modifier = Modifier.padding(top = 3.dp, bottom = 12.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CompactNumberField("统一宽度", widthText, { widthText = it }, Modifier.weight(1f))
+                CompactNumberField("统一高度", heightText, { heightText = it }, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TinyButton("应用", {
+                    onApply(widthText.toFloatOrNull(), heightText.toFloatOrNull())
+                }, primary = true)
+                TinyButton("取消", onDismiss)
+            }
+            Spacer(Modifier.height(22.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun QuickActionSheet(
     element: EditorElement,
     cropMode: Boolean,
