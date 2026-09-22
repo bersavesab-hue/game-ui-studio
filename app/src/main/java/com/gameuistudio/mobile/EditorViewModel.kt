@@ -284,6 +284,29 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun importWebRebuild(data: WebRebuildData) {
+        mutate {
+            syncCurrentPage()
+            data.assets.forEach { asset ->
+                if (assetLibrary.none { it.path == asset.path }) assetLibrary += asset
+            }
+            val normalized = data.elements
+                .sortedBy { it.zIndex }
+                .mapIndexed { index, element -> element.copy(zIndex = index) }
+            val page = EditorPage(
+                id = UUID.randomUUID().toString(),
+                name = data.pageName.ifBlank { "Web UI 自动拆页" },
+                elements = normalized
+            )
+            pages += page
+            currentPageId = page.id
+            elements.clear()
+            elements.addAll(normalized)
+            selectedIds.clear()
+            activeGroupEditId = null
+        }
+    }
+
     fun insertAsset(assetId: String) {
         val asset = assetLibrary.firstOrNull { it.id == assetId } ?: return
         mutate { addImageElement(asset, elements.size) }
