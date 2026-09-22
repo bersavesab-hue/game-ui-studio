@@ -127,7 +127,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                 BitmapFactory.decodeFile(file.absolutePath, options)
                 val ratio = if (options.outWidth > 0 && options.outHeight > 0) {
                     options.outWidth.toFloat() / options.outHeight
-                } else 16f / 9f
+                } else 9f / 16f
                 vm.addImage(relative, name, ratio)
             }
         }
@@ -170,10 +170,9 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
         containerColor = Color(0xFF0B0D10),
         modifier = Modifier.fillMaxSize().safeDrawingPadding(),
         topBar = {
-            CompactTopBar(
+            PortraitTopBar(
                 projectName = vm.projectName,
                 preset = preset,
-                zoom = canvasZoom,
                 onUndo = vm::undo,
                 onRedo = vm::redo,
                 onPresetClick = { showPresetMenu = true },
@@ -195,8 +194,6 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                         }
                     }
                 },
-                onZoomOut = { canvasZoom = (canvasZoom - 0.1f).coerceAtLeast(0.35f) },
-                onZoomIn = { canvasZoom = (canvasZoom + 0.1f).coerceAtMost(3f) },
                 onFit = { canvasZoom = 1f },
                 onMore = { showMoreTools = true }
             )
@@ -205,9 +202,8 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
         Box(Modifier.padding(innerPadding).fillMaxSize()) {
             Box(
                 Modifier.fillMaxSize().padding(
-                    start = 58.dp,
-                    end = 58.dp,
-                    bottom = if (vm.selectedIds.isNotEmpty()) 56.dp else 6.dp
+                    horizontal = 6.dp,
+                    bottom = if (vm.selectedIds.isNotEmpty()) 114.dp else 58.dp
                 )
             ) {
                 CanvasWorkspace(
@@ -231,37 +227,14 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                 }
             }
 
-            MobileToolRail(
-                modifier = Modifier.align(Alignment.CenterStart),
-                onImport = { imageLauncher.launch(arrayOf("image/*")) },
-                onAddText = vm::addText,
-                onAddButton = vm::addButton,
-                onAddPanel = vm::addPanel,
-                multiSelect = vm.multiSelectMode,
-                navigationMode = canvasNavigationMode,
-                onToggleMulti = vm::toggleMultiSelectMode,
-                onToggleNavigation = {
-                    canvasNavigationMode = !canvasNavigationMode
-                    if (canvasNavigationMode && vm.multiSelectMode) vm.toggleMultiSelectMode()
-                }
-            )
-
-            QuickRail(
-                modifier = Modifier.align(Alignment.CenterEnd),
-                hasSelection = vm.selectedIds.size == 1,
-                onLayers = { showLayers = true },
-                onPages = { showPages = true },
-                onLibrary = { showLibrary = true },
-                onProperties = { if (vm.selectedIds.size == 1) showProperties = true }
-            )
-
             if (vm.selectedIds.isNotEmpty()) {
                 Box(
                     Modifier.align(Alignment.BottomCenter)
-                        .padding(start = 58.dp, end = 58.dp, bottom = 2.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .padding(start = 6.dp, end = 6.dp, bottom = 58.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xF2181C23))
-                        .border(1.dp, Color(0xFF343B47), RoundedCornerShape(14.dp))
+                        .border(1.dp, Color(0xFF343B47), RoundedCornerShape(12.dp))
                 ) {
                     SelectedToolBar(
                         selected = vm.selected,
@@ -292,6 +265,16 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                     )
                 }
             }
+
+            PortraitBottomDock(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                onImport = { imageLauncher.launch(arrayOf("image/*")) },
+                onAddText = vm::addText,
+                onAddButton = vm::addButton,
+                onPages = { showPages = true },
+                onLayers = { showLayers = true },
+                onMore = { showMoreTools = true }
+            )
         }
     }
 
@@ -302,6 +285,8 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             multiSelect = vm.multiSelectMode,
             navigationMode = canvasNavigationMode,
             onDismiss = { showMoreTools = false },
+            onAddPanel = vm::addPanel,
+            onLibrary = { showMoreTools = false; showLibrary = true },
             onToggleSafe = { showSafeArea = !showSafeArea },
             onToggleSnap = vm::toggleSnapping,
             onToggleMulti = vm::toggleMultiSelectMode,
@@ -339,6 +324,86 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
         projectRoot = File(context.filesDir, "game_ui_studio/current"),
         onDismiss = { showLibrary = false }
     )
+}
+
+@Composable
+private fun PortraitTopBar(
+    projectName: String,
+    preset: PreviewPreset,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onPresetClick: () -> Unit,
+    presetMenu: @Composable () -> Unit,
+    onFit: () -> Unit,
+    onMore: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().height(48.dp).background(Color(0xFF171B22)).padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            projectName,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        CompactButton("↶", onUndo)
+        CompactButton("↷", onRedo)
+        Box {
+            CompactButton(preset.label.removePrefix("设计稿 "), onPresetClick, wide = true)
+            presetMenu()
+        }
+        CompactButton("适配", onFit, wide = true, primary = true)
+        CompactButton("⋯", onMore)
+    }
+}
+
+@Composable
+private fun PortraitBottomDock(
+    modifier: Modifier = Modifier,
+    onImport: () -> Unit,
+    onAddText: () -> Unit,
+    onAddButton: () -> Unit,
+    onPages: () -> Unit,
+    onLayers: () -> Unit,
+    onMore: () -> Unit
+) {
+    Row(
+        modifier.fillMaxWidth().height(56.dp)
+            .background(Color(0xFF171B22))
+            .padding(horizontal = 4.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        PortraitDockButton("图片", onImport, primary = true)
+        PortraitDockButton("文字", onAddText)
+        PortraitDockButton("按钮", onAddButton)
+        PortraitDockButton("页面", onPages)
+        PortraitDockButton("图层", onLayers)
+        PortraitDockButton("更多", onMore)
+    }
+}
+
+@Composable
+private fun PortraitDockButton(
+    label: String,
+    onClick: () -> Unit,
+    primary: Boolean = false
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.height(44.dp).width(56.dp),
+        shape = RoundedCornerShape(11.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (primary) Color(0xFF2563EB) else Color(0xFF282E37)
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+    ) {
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
 }
 
 @Composable
@@ -497,6 +562,8 @@ private fun MoreToolsSheet(
     multiSelect: Boolean,
     navigationMode: Boolean,
     onDismiss: () -> Unit,
+    onAddPanel: () -> Unit,
+    onLibrary: () -> Unit,
     onToggleSafe: () -> Unit,
     onToggleSnap: () -> Unit,
     onToggleMulti: () -> Unit,
@@ -507,8 +574,18 @@ private fun MoreToolsSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF20242B)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)) {
-            Text("编辑器设置", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("更多工具", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TinyButton("添加面板", onAddPanel, primary = true)
+                TinyButton("素材库", onLibrary)
+            }
+            Spacer(Modifier.height(14.dp))
+            Text("画布与选择", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
