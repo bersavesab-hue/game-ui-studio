@@ -3,6 +3,7 @@ package com.gameuistudio.mobile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,9 +23,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,7 +53,7 @@ fun LayersSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
             ) {
                 Column {
                     Text("图层", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("多选模式下点图层可追加/取消选择", fontSize = 11.sp, color = Color(0xFF9CA3AF))
+                    Text("点选图层；长按后上下拖动可调整层级", fontSize = 11.sp, color = Color(0xFF9CA3AF))
                 }
                 Text("${vm.elements.size} 个元素", fontSize = 12.sp, color = Color(0xFFB6BDC8))
             }
@@ -63,8 +70,11 @@ fun LayersSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
                 }
             }
 
+            val reorderThresholdPx = with(LocalDensity.current) { 38.dp.toPx() }
+
             vm.elements.sortedByDescending { it.zIndex }.forEach { item ->
                 val selected = vm.isSelected(item.id)
+                var dragDistance by remember(item.id) { mutableFloatStateOf(0f) }
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         .background(
@@ -77,6 +87,28 @@ fun LayersSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
                             RoundedCornerShape(10.dp)
                         )
                         .clickable { vm.selectElement(item.id) }
+                        .pointerInput(item.id, item.isBackground) {
+                            if (item.isBackground) return@pointerInput
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragDistance = 0f
+                                    vm.selectElement(item.id)
+                                },
+                                onDragEnd = { dragDistance = 0f },
+                                onDragCancel = { dragDistance = 0f },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragDistance += amount.y
+                                    if (dragDistance <= -reorderThresholdPx) {
+                                        vm.moveLayerUp(item.id)
+                                        dragDistance = 0f
+                                    } else if (dragDistance >= reorderThresholdPx) {
+                                        vm.moveLayerDown(item.id)
+                                        dragDistance = 0f
+                                    }
+                                }
+                            )
+                        }
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -103,6 +135,9 @@ fun LayersSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
                             if (item.groupId != null) {
                                 Text(" 组", fontSize = 9.sp, color = Color(0xFF5EEAD4))
                             }
+                            if (item.isBackground) {
+                                Text(" 背景", fontSize = 9.sp, color = Color(0xFFFBBF24))
+                            }
                         }
                         Text(
                             "z=${item.zIndex}  ${item.x.toInt()},${item.y.toInt()}  ${item.width.toInt()}×${item.height.toInt()}",
@@ -117,8 +152,8 @@ fun LayersSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
                     ) {
                         LayerButton(if (item.hidden) "显示" else "隐藏") { vm.toggleVisibility(item.id) }
                         LayerButton(if (item.locked) "解锁" else "锁") { vm.toggleLock(item.id) }
-                        LayerButton("↑") { vm.moveLayerUp(item.id) }
-                        LayerButton("↓") { vm.moveLayerDown(item.id) }
+                        LayerButton("↑", enabled = !item.isBackground) { vm.moveLayerUp(item.id) }
+                        LayerButton("↓", enabled = !item.isBackground) { vm.moveLayerDown(item.id) }
                     }
                 }
             }
@@ -129,9 +164,10 @@ fun LayersSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun LayerButton(text: String, onClick: () -> Unit) {
+private fun LayerButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF353B46)),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 5.dp)
     ) { Text(text, fontSize = 10.sp) }
