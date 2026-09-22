@@ -119,6 +119,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var showBatchSize by remember { mutableStateOf(false) }
     var apkResult by remember { mutableStateOf<ApkInspectionResult?>(null) }
     var showApkImport by remember { mutableStateOf(false) }
+    var showWebCapture by remember { mutableStateOf(false) }
     var customPreset by remember { mutableStateOf<PreviewPreset?>(null) }
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
@@ -415,9 +416,30 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                 vm.createApkRebuildPage("APK 重建 · ${currentApkResult.fileName.substringBeforeLast('.')}")
                 showApkImport = false
             },
+            onOpenWebCapture = {
+                showApkImport = false
+                showWebCapture = true
+            },
             onOpenLibrary = {
                 showApkImport = false
                 showLibrary = true
+            }
+        )
+    }
+
+
+    if (showWebCapture && currentApkResult != null) {
+        WebUiCaptureSheet(
+            result = currentApkResult,
+            onDismiss = { showWebCapture = false },
+            onCaptured = { capture ->
+                val rebuild = WebUiCapture.buildRebuildData(context, currentApkResult, capture)
+                vm.importWebRebuild(rebuild)
+                ProjectStorage.save(context, vm.toProject())
+                presetIndex = 0
+                customPreset = null
+                canvasZoom = 1f
+                showWebCapture = false
             }
         )
     }
