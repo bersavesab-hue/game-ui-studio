@@ -771,6 +771,12 @@ class EditorViewModel : ViewModel() {
         mutate { replace(id) { it.copy(fontWeightMode = mode) } }
     }
 
+    fun setFontFamily(mode: FontFamilyMode) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(fontFamilyMode = mode) } }
+    }
+
     fun setTextAlign(mode: TextAlignMode) {
         val id = selectedId ?: return
         if (selectedIds.size != 1) return
