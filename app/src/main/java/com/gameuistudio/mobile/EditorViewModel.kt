@@ -594,6 +594,69 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun resizeFromHandleTransient(
+        id: String,
+        handle: String,
+        dx: Float,
+        dy: Float,
+        keepRatio: Boolean = false
+    ) {
+        if (selectedIds.size > 1) return
+        replace(id) { e ->
+            if (e.locked || e.isBackground) return@replace e
+
+            val leftHandle = handle == "tl" || handle == "bl"
+            val topHandle = handle == "tl" || handle == "tr"
+            val ratio = (e.width / e.height.coerceAtLeast(1f)).coerceAtLeast(0.05f)
+
+            var targetW = e.width + if (leftHandle) -dx else dx
+            var targetH = e.height + if (topHandle) -dy else dy
+
+            if (keepRatio) {
+                val widthChange = abs(targetW - e.width) / e.width.coerceAtLeast(1f)
+                val heightChange = abs(targetH - e.height) / e.height.coerceAtLeast(1f)
+                if (widthChange >= heightChange) targetH = targetW / ratio
+                else targetW = targetH * ratio
+            }
+
+            targetW = targetW.coerceAtLeast(40f)
+            targetH = targetH.coerceAtLeast(40f)
+
+            var newX = if (leftHandle) e.x + e.width - targetW else e.x
+            var newY = if (topHandle) e.y + e.height - targetH else e.y
+
+            if (newX < 0f) {
+                targetW += newX
+                newX = 0f
+                if (keepRatio) targetH = targetW / ratio
+            }
+            if (newY < 0f) {
+                targetH += newY
+                newY = 0f
+                if (keepRatio) targetW = targetH * ratio
+            }
+
+            if (newX + targetW > DESIGN_WIDTH) {
+                targetW = DESIGN_WIDTH - newX
+                if (keepRatio) targetH = targetW / ratio
+            }
+            if (newY + targetH > DESIGN_HEIGHT) {
+                targetH = DESIGN_HEIGHT - newY
+                if (keepRatio) targetW = targetH * ratio
+            }
+
+            if (leftHandle) newX = (e.x + e.width - targetW).coerceAtLeast(0f)
+            if (topHandle) newY = (e.y + e.height - targetH).coerceAtLeast(0f)
+
+            e.copy(
+                x = newX,
+                y = newY,
+                width = targetW.coerceAtLeast(40f),
+                height = targetH.coerceAtLeast(40f)
+            )
+        }
+    }
+
     fun updateCropTransient(id: String, panX: Float, panY: Float, zoomFactor: Float, rotationDelta: Float) {
         if (selectedIds.size > 1) return
         replace(id) { e ->
@@ -888,7 +951,7 @@ class EditorViewModel : ViewModel() {
     private data class SnapCandidate(val value: Float, val guide: Float)
 
     private fun bestSelectionXSnap(moving: List<EditorElement>, bounds: Bounds, proposedDx: Float): SnapCandidate? {
-        val threshold = 12f
+        val threshold = 18f
         val excluded = moving.map { it.id }.toSet()
         val candidates = mutableListOf(
             SnapCandidate(-bounds.left, 0f),
