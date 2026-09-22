@@ -267,6 +267,11 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                         onRotateLeft = { vm.rotateSelected(-90f) },
                         onRotateRight = { vm.rotateSelected(90f) },
                         onNudge = { dx, dy -> vm.nudgeSelected(dx, dy) },
+                        onCopyStyle = vm::copySelectedStyle,
+                        onPasteStyle = vm::pasteCopiedStyle,
+                        onSameWidth = vm::makeSameWidth,
+                        onSameHeight = vm::makeSameHeight,
+                        onSameSize = vm::makeSameSize,
                         onDuplicate = vm::duplicateSelected,
                         onDelete = vm::deleteSelected,
                         onFront = vm::bringToFront,
@@ -823,12 +828,34 @@ private fun CanvasWorkspace(
                             Modifier.offset((guideX * renderScale).dp, 0.dp)
                                 .width(1.dp).fillMaxHeight().background(Color(0xFFFF3D9A))
                         )
+                        vm.snapDistanceX?.let { distance ->
+                            Text(
+                                "吸附 ${distance.toInt()}",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                modifier = Modifier
+                                    .offset(((guideX * renderScale) + 4f).dp, 6.dp)
+                                    .background(Color(0xDDC2185B), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                     vm.snapGuideY?.let { guideY ->
                         Box(
                             Modifier.offset(0.dp, (guideY * renderScale).dp)
                                 .height(1.dp).fillMaxWidth().background(Color(0xFFFF3D9A))
                         )
+                        vm.snapDistanceY?.let { distance ->
+                            Text(
+                                "吸附 ${distance.toInt()}",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                modifier = Modifier
+                                    .offset(6.dp, ((guideY * renderScale) + 4f).dp)
+                                    .background(Color(0xDDC2185B), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
@@ -1296,6 +1323,11 @@ private fun SelectedToolBar(
     onRotateLeft: () -> Unit,
     onRotateRight: () -> Unit,
     onNudge: (Float, Float) -> Unit,
+    onCopyStyle: () -> Unit,
+    onPasteStyle: () -> Unit,
+    onSameWidth: () -> Unit,
+    onSameHeight: () -> Unit,
+    onSameSize: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
     onFront: () -> Unit,
@@ -1349,11 +1381,16 @@ private fun SelectedToolBar(
                 TinyButton("↓", { onNudge(0f, 4f) })
                 TinyButton("→", { onNudge(4f, 0f) })
             }
+            if (selectedCount == 1) TinyButton("复制样式", onCopyStyle)
+            TinyButton("粘贴样式", onPasteStyle)
             TinyButton("复制", onDuplicate)
             TinyButton("置顶", onFront)
             TinyButton("置底", onBack)
             TinyButton("锁定/解锁", onLock)
             if (selectedCount >= 2) {
+                TinyButton("同宽", onSameWidth)
+                TinyButton("同高", onSameHeight)
+                TinyButton("同尺寸", onSameSize)
                 TinyButton("组合", onGroup, primary = true)
                 TinyButton("取消组合", onUngroup)
                 TinyButton("左齐", { onAlign("left") })
