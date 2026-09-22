@@ -1,0 +1,73 @@
+name: Bootstrap Source and Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'bootstrap/**'
+      - '.github/workflows/bootstrap-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct source archive
+        shell: bash
+        run: |
+          cat bootstrap/source.part00 bootstrap/source.part01 bootstrap/source.part02 bootstrap/source.part03 bootstrap/source.part04 bootstrap/source.part05 bootstrap/source.part06 > source.b64
+          base64 --decode source.b64 > source.zip
+          unzip -q source.zip -d extracted
+          test -f extracted/game-ui-studio/app/build.gradle.kts
+
+      - name: Promote source into repository
+        shell: bash
+        run: |
+          shopt -s dotglob
+          cp -a extracted/game-ui-studio/. .
+          rm -rf bootstrap extracted source.b64 source.zip
+          rm -f .github/workflows/bootstrap-build.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "build: promote Android source v0.4.0"
+            git push origin HEAD:main
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 35 SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-ui-studio-v0.4.0-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
