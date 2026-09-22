@@ -1139,6 +1139,134 @@ private fun SelectedToolBar(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun AdaptationCheckSheet(
+    elements: List<EditorElement>,
+    customPreset: PreviewPreset?,
+    onDismiss: () -> Unit,
+    onApplyCustom: (Float, Float) -> Unit,
+    onUseDesign: () -> Unit
+) {
+    var widthText by remember(customPreset) { mutableStateOf((customPreset?.width ?: 1080f).toInt().toString()) }
+    var heightText by remember(customPreset) { mutableStateOf((customPreset?.height ?: 2400f).toInt().toString()) }
+    val issues = validateAllPresets(elements, customPreset)
+    val grouped = issues.groupBy { it.presetLabel }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF20242B)) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(18.dp)
+        ) {
+            Text("一键适配检查", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "9:16 是设计母版；这里会同时检查主流长屏、超长屏和竖屏平板。",
+                fontSize = 12.sp,
+                color = Color(0xFF9CA3AF),
+                modifier = Modifier.padding(top = 4.dp, bottom = 14.dp)
+            )
+
+            PREVIEW_PRESETS.forEach { preset ->
+                val list = grouped[preset.label].orEmpty()
+                val errors = list.count { it.severity == AdaptationSeverity.ERROR }
+                val warnings = list.count { it.severity == AdaptationSeverity.WARNING }
+                val infos = list.count { it.severity == AdaptationSeverity.INFO }
+                Column(
+                    Modifier.fillMaxWidth()
+                        .padding(vertical = 5.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF292E37))
+                        .padding(10.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${preset.label} · ${preset.width.toInt()}×${preset.height.toInt()}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            when {
+                                errors > 0 -> "$errors 错误"
+                                warnings > 0 -> "$warnings 警告"
+                                else -> "通过"
+                            },
+                            color = when {
+                                errors > 0 -> Color(0xFFEF4444)
+                                warnings > 0 -> Color(0xFFF59E0B)
+                                else -> Color(0xFF10B981)
+                            },
+                            fontSize = 12.sp
+                        )
+                    }
+                    list.take(4).forEach { issue ->
+                        val prefix = when (issue.severity) {
+                            AdaptationSeverity.ERROR -> "●"
+                            AdaptationSeverity.WARNING -> "▲"
+                            AdaptationSeverity.INFO -> "·"
+                        }
+                        Text(
+                            "$prefix ${issue.message}",
+                            color = when (issue.severity) {
+                                AdaptationSeverity.ERROR -> Color(0xFFFF8A8A)
+                                AdaptationSeverity.WARNING -> Color(0xFFFBBF24)
+                                AdaptationSeverity.INFO -> Color(0xFFB6BDC8)
+                            },
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    if (list.size > 4) {
+                        Text("另有 ${list.size - 4} 条", fontSize = 10.sp, color = Color(0xFF8B95A5))
+                    }
+                    if (infos > 0 && errors == 0 && warnings == 0) {
+                        Text("信息提示 $infos 条", fontSize = 10.sp, color = Color(0xFF8B95A5))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("自定义设备预览", fontWeight = FontWeight.Bold)
+            Text(
+                "可直接输入任意竖屏分辨率，例如 1080×2376、1440×3200。",
+                fontSize = 11.sp,
+                color = Color(0xFF9CA3AF),
+                modifier = Modifier.padding(top = 3.dp, bottom = 8.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = widthText,
+                    onValueChange = { widthText = it.filter(Char::isDigit).take(5) },
+                    label = { Text("宽") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = heightText,
+                    onValueChange = { heightText = it.filter(Char::isDigit).take(5) },
+                    label = { Text("高") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TinyButton("预览自定义", {
+                    val w = widthText.toFloatOrNull()
+                    val h = heightText.toFloatOrNull()
+                    if (w != null && h != null && w in 320f..5000f && h in 480f..7000f) {
+                        onApplyCustom(w, h)
+                        onDismiss()
+                    }
+                }, primary = true)
+                TinyButton("回到 9:16 编辑", {
+                    onUseDesign()
+                    onDismiss()
+                })
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("边界说明", fontWeight = FontWeight.Bold)
+            Text("绿色框：系统安全区；橙色框：9:16 核心 UI 区。长屏多出来的区域优先留给背景和装饰。", fontSize = 11.sp, color = Color(0xFFB6BDC8), modifier = Modifier.padding(top = 5.dp))
+            Spacer(Modifier.height(26.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun PropertiesSheet(
     element: EditorElement,
     onDismiss: () -> Unit,
