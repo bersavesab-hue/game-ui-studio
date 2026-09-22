@@ -28,6 +28,9 @@ enum class TextAlignMode { LEFT, CENTER, RIGHT }
 enum class FontWeightMode { NORMAL, MEDIUM, BOLD }
 
 @Serializable
+enum class FontFamilyMode { SANS, SERIF, MONO }
+
+@Serializable
 data class EditorElement(
     val id: String,
     val type: ElementType,
@@ -70,7 +73,8 @@ data class EditorElement(
     val shadowRadius: Float = 0f,
     val shadowOffsetY: Float = 0f,
     val textAlign: TextAlignMode = TextAlignMode.CENTER,
-    val fontWeightMode: FontWeightMode = FontWeightMode.MEDIUM
+    val fontWeightMode: FontWeightMode = FontWeightMode.MEDIUM,
+    val fontFamilyMode: FontFamilyMode = FontFamilyMode.SANS
 )
 
 @Serializable
