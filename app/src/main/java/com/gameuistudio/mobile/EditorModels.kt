@@ -19,6 +19,9 @@ enum class Anchor {
 enum class SizeMode { FIXED, PERCENT, STRETCH }
 
 @Serializable
+enum class ImageFit { COVER, CONTAIN, FILL, FIT_WIDTH, FIT_HEIGHT }
+
+@Serializable
 data class EditorElement(
     val id: String,
     val type: ElementType,
@@ -48,7 +51,9 @@ data class EditorElement(
     val cornerRadius: Float = 0f,
     val brightness: Float = 1f,
     val contrast: Float = 1f,
-    val saturation: Float = 1f
+    val saturation: Float = 1f,
+    val isBackground: Boolean = false,
+    val imageFit: ImageFit = ImageFit.COVER
 )
 
 @Serializable
@@ -84,7 +89,7 @@ data class PageTemplate(
 
 @Serializable
 data class ProjectData(
-    val version: Int = 4,
+    val version: Int = 5,
     val projectName: String = "未命名 UI 工程",
     val designWidth: Float = DESIGN_WIDTH,
     val designHeight: Float = DESIGN_HEIGHT,
@@ -110,6 +115,7 @@ data class PreviewPreset(
 
 val PREVIEW_PRESETS = listOf(
     PreviewPreset("设计稿 9:16", 1080f, 1920f),
+    PreviewPreset("主流 9:19.5", 1080f, 2340f),
     PreviewPreset("长屏 9:20", 1080f, 2400f),
     PreviewPreset("超长屏 9:21", 1080f, 2520f),
     PreviewPreset("10:16", 1200f, 1920f),
@@ -124,6 +130,10 @@ data class ResolvedRect(
 )
 
 fun resolveElement(element: EditorElement, previewWidth: Float, previewHeight: Float): ResolvedRect {
+    if (element.isBackground) {
+        return ResolvedRect(0f, 0f, previewWidth, previewHeight)
+    }
+
     val leftMargin = element.x
     val rightMargin = DESIGN_WIDTH - (element.x + element.width)
     val topMargin = element.y
