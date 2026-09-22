@@ -233,6 +233,64 @@ fun LibrarySheet(vm: EditorViewModel, projectRoot: File, onDismiss: () -> Unit) 
 }
 
 @Composable
+private fun MiniLayoutPreview(
+    elements: List<EditorElement>,
+    sourceWidth: Float,
+    sourceHeight: Float,
+    modifier: Modifier = Modifier
+) {
+    val safeW = sourceWidth.coerceAtLeast(1f)
+    val safeH = sourceHeight.coerceAtLeast(1f)
+    Box(
+        modifier.background(Color(0xFF111318), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFF46505D), RoundedCornerShape(8.dp))
+    ) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(84.dp)) {
+            val scale = kotlin.math.min(maxWidth.value / safeW, maxHeight.value / safeH)
+            elements.sortedBy { it.zIndex }.filterNot { it.hidden }.forEach { e ->
+                val color = when (e.type) {
+                    ElementType.IMAGE -> Color(0xFF64748B)
+                    ElementType.TEXT -> Color(0xFFFBBF24)
+                    ElementType.BUTTON -> Color(0xFF2563EB)
+                    ElementType.PANEL -> Color(0xFF0F766E)
+                }.copy(alpha = if (e.opacity < 0.15f) 0.15f else e.opacity.coerceIn(0.2f, 1f))
+                Box(
+                    Modifier
+                        .offset((e.x * scale).dp, (e.y * scale).dp)
+                        .size(
+                            (e.width * scale).coerceAtLeast(2f).dp,
+                            (e.height * scale).coerceAtLeast(2f).dp
+                        )
+                        .background(color, RoundedCornerShape(2.dp))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenameRow(
+    value: String,
+    onChange: (String) -> Unit,
+    onApply: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { onChange(it.take(30)) },
+            label = { Text("新名称") },
+            singleLine = true,
+            modifier = Modifier.weight(1f)
+        )
+        LibraryButton("应用", primary = true, onClick = onApply)
+    }
+}
+
+@Composable
 private fun SectionTitle(title: String, count: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold)
