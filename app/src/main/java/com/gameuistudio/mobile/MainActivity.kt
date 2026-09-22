@@ -112,6 +112,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var showLibrary by remember { mutableStateOf(false) }
     var showMoreTools by remember { mutableStateOf(false) }
     var showAdaptation by remember { mutableStateOf(false) }
+    var showQuickActions by remember { mutableStateOf(false) }
     var customPreset by remember { mutableStateOf<PreviewPreset?>(null) }
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
@@ -220,11 +221,17 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                     cropMode = cropMode,
                     navigationMode = canvasNavigationMode,
                     assetsRoot = File(context.filesDir, "game_ui_studio/current"),
-                    onCanvasZoomChange = { canvasZoom = it.coerceIn(0.35f, 3f) }
+                    onCanvasZoomChange = { canvasZoom = it.coerceIn(0.35f, 3f) },
+                    onElementLongPress = {
+                        vm.selectElement(it)
+                        showQuickActions = true
+                    }
                 )
 
                 if (canvasNavigationMode) {
-                    EditorModeBadge("画布导航 · 拖动 / 双指缩放", Color(0xDD7C3AED))
+                    EditorModeBadge("画布导航 · 拖动 / 双指缩放 · 双击适配", Color(0xDD7C3AED))
+                } else if (cropMode) {
+                    EditorModeBadge("裁剪 · 单指拖图 · 双指缩放/旋转", Color(0xDD0F766E))
                 } else if (!editable) {
                     EditorModeBadge("适配预览 · 只读", Color(0xCC111318))
                 } else if (vm.multiSelectMode) {
@@ -253,6 +260,10 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                             if (!cropMode) vm.beginTransaction() else vm.endTransaction()
                             cropMode = !cropMode
                         },
+                        onResetImage = vm::resetImageTransform,
+                        onRotateLeft = { vm.rotateSelected(-90f) },
+                        onRotateRight = { vm.rotateSelected(90f) },
+                        onNudge = { dx, dy -> vm.nudgeSelected(dx, dy) },
                         onDuplicate = vm::duplicateSelected,
                         onDelete = vm::deleteSelected,
                         onFront = vm::bringToFront,
@@ -276,6 +287,11 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                 onImport = { imageLauncher.launch(arrayOf("image/*")) },
                 onAddText = vm::addText,
                 onAddButton = vm::addButton,
+                navigationMode = canvasNavigationMode,
+                onToggleNavigation = {
+                    canvasNavigationMode = !canvasNavigationMode
+                    if (canvasNavigationMode && vm.multiSelectMode) vm.toggleMultiSelectMode()
+                },
                 onPages = { showPages = true },
                 onLayers = { showLayers = true },
                 onMore = { showMoreTools = true }
@@ -306,6 +322,28 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                 exportJsonLauncher.launch("${vm.projectName}.json")
             },
             onExportProject = { exportZipLauncher.launch("${vm.projectName}.guiproject.zip") }
+        )
+    }
+
+
+    if (showQuickActions && vm.selected != null && vm.selectedIds.size == 1) {
+        QuickActionSheet(
+            element = vm.selected!!,
+            cropMode = cropMode,
+            onDismiss = { showQuickActions = false },
+            onCrop = {
+                if (vm.selected?.type == ElementType.IMAGE) {
+                    if (!cropMode) vm.beginTransaction()
+                    cropMode = true
+                }
+                showQuickActions = false
+            },
+            onDuplicate = { vm.duplicateSelected(); showQuickActions = false },
+            onFront = { vm.bringToFront(); showQuickActions = false },
+            onBack = { vm.sendToBack(); showQuickActions = false },
+            onLock = { vm.toggleLock(); showQuickActions = false },
+            onProperties = { showQuickActions = false; showProperties = true },
+            onDelete = { vm.deleteSelected(); showQuickActions = false }
         )
     }
 
