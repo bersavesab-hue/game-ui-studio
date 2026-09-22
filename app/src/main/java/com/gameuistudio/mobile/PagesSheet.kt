@@ -64,6 +64,11 @@ fun PagesSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
                 PageActionButton("复制当前") { vm.duplicateCurrentPage() }
                 PageActionButton("删除当前", danger = true) { vm.deleteCurrentPage() }
             }
+            Spacer(Modifier.height(6.dp))
+            PageActionButton("一键生成「门店管理」骨架", primary = true) {
+                vm.createStoreManagementSkeleton()
+                rename = "门店管理"
+            }
 
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
@@ -109,10 +114,21 @@ fun PagesSheet(vm: EditorViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun PageActionButton(text: String, danger: Boolean = false, onClick: () -> Unit) {
+private fun PageActionButton(
+    text: String,
+    danger: Boolean = false,
+    primary: Boolean = false,
+    onClick: () -> Unit
+) {
     Button(
         onClick = onClick,
-        colors = ButtonDefaults.buttonColors(containerColor = if (danger) Color(0xFF7F1D1D) else Color(0xFF353B46)),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = when {
+                danger -> Color(0xFF7F1D1D)
+                primary -> Color(0xFF2563EB)
+                else -> Color(0xFF353B46)
+            }
+        ),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)
     ) { Text(text, fontSize = 11.sp) }
 }
