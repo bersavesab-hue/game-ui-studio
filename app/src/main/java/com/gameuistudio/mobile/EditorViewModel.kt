@@ -85,7 +85,7 @@ class EditorViewModel : ViewModel() {
         )
 
         return project.copy(
-            version = 5,
+            version = 6,
             designWidth = DESIGN_WIDTH,
             designHeight = DESIGN_HEIGHT,
             pages = project.pages.map { page -> page.copy(elements = page.elements.map(::migrateElement)) },
@@ -151,7 +151,7 @@ class EditorViewModel : ViewModel() {
     fun toProject(): ProjectData {
         syncCurrentPage()
         return ProjectData(
-            version = 5,
+            version = 6,
             projectName = projectName,
             pages = pages.toList(),
             currentPageId = currentPageId,
@@ -280,11 +280,25 @@ class EditorViewModel : ViewModel() {
         setSelection(listOf(item.id))
     }
 
-    fun addText() = addSimpleElement(ElementType.TEXT, "文字", 420f, 100f, text = "文字", fontSize = 48f)
+    fun addText() = addSimpleElement(
+        ElementType.TEXT, "文字", 420f, 100f,
+        text = "文字", fontSize = 48f,
+        textColor = 0xFF111318.toInt(),
+        fillColor = 0x00000000
+    )
 
-    fun addButton() = addSimpleElement(ElementType.BUTTON, "按钮", 300f, 112f, text = "按钮", fontSize = 42f, radius = 22f)
+    fun addButton() = addSimpleElement(
+        ElementType.BUTTON, "按钮", 300f, 112f,
+        text = "按钮", fontSize = 42f, radius = 22f,
+        fillColor = 0xFF2563EB.toInt(),
+        textColor = 0xFFFFFFFF.toInt()
+    )
 
-    fun addPanel() = addSimpleElement(ElementType.PANEL, "面板", 560f, 320f, radius = 28f, opacity = 0.9f)
+    fun addPanel() = addSimpleElement(
+        ElementType.PANEL, "面板", 560f, 320f,
+        radius = 28f, opacity = 0.9f,
+        fillColor = 0xFFCBD5E1.toInt()
+    )
 
     private fun addSimpleElement(
         type: ElementType,
@@ -294,14 +308,17 @@ class EditorViewModel : ViewModel() {
         text: String = "",
         fontSize: Float = 42f,
         radius: Float = 0f,
-        opacity: Float = 1f
+        opacity: Float = 1f,
+        fillColor: Int = 0xFF2563EB.toInt(),
+        textColor: Int = 0xFFFFFFFF.toInt()
     ) {
         mutate {
             val item = EditorElement(
                 id = UUID.randomUUID().toString(), type = type, name = name,
                 x = (DESIGN_WIDTH - w) / 2f, y = (DESIGN_HEIGHT - h) / 2f,
                 width = w, height = h, zIndex = nextZ(), text = text,
-                fontSize = fontSize, cornerRadius = radius, opacity = opacity
+                fontSize = fontSize, cornerRadius = radius, opacity = opacity,
+                fillColor = fillColor, textColor = textColor
             )
             elements += item
             setSelection(listOf(item.id))
@@ -725,6 +742,92 @@ class EditorViewModel : ViewModel() {
                 contrast = contrast ?: e.contrast,
                 saturation = saturation ?: e.saturation
             )
+        }
+    }
+
+    fun updateGeometry(x: Float? = null, y: Float? = null, width: Float? = null, height: Float? = null) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate {
+            replace(id) { e ->
+                val nw = (width ?: e.width).coerceIn(40f, DESIGN_WIDTH)
+                val nh = (height ?: e.height).coerceIn(40f, DESIGN_HEIGHT)
+                val nx = (x ?: e.x).coerceIn(0f, DESIGN_WIDTH - nw)
+                val ny = (y ?: e.y).coerceIn(0f, DESIGN_HEIGHT - nh)
+                e.copy(x = nx, y = ny, width = nw, height = nh)
+            }
+        }
+    }
+
+    fun setFontSize(value: Float) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(fontSize = value.coerceIn(8f, 240f)) } }
+    }
+
+    fun setFontWeight(mode: FontWeightMode) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(fontWeightMode = mode) } }
+    }
+
+    fun setTextAlign(mode: TextAlignMode) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(textAlign = mode) } }
+    }
+
+    fun setFillColor(color: Int) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(fillColor = color) } }
+    }
+
+    fun setTextColor(color: Int) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(textColor = color) } }
+    }
+
+    fun setBorderColor(color: Int) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(borderColor = color) } }
+    }
+
+    fun setGradientEndColor(color: Int) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(gradientEndColor = color) } }
+    }
+
+    fun toggleGradient() {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate { replace(id) { it.copy(gradientEnabled = !it.gradientEnabled) } }
+    }
+
+    fun updateVisualStyle(
+        radius: Float? = null,
+        opacity: Float? = null,
+        borderWidth: Float? = null,
+        shadowAlpha: Float? = null,
+        shadowRadius: Float? = null,
+        shadowOffsetY: Float? = null
+    ) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate {
+            replace(id) { e ->
+                e.copy(
+                    cornerRadius = radius?.coerceIn(0f, 240f) ?: e.cornerRadius,
+                    opacity = opacity?.coerceIn(0f, 1f) ?: e.opacity,
+                    borderWidth = borderWidth?.coerceIn(0f, 40f) ?: e.borderWidth,
+                    shadowAlpha = shadowAlpha?.coerceIn(0f, 1f) ?: e.shadowAlpha,
+                    shadowRadius = shadowRadius?.coerceIn(0f, 80f) ?: e.shadowRadius,
+                    shadowOffsetY = shadowOffsetY?.coerceIn(-80f, 80f) ?: e.shadowOffsetY
+                )
+            }
         }
     }
 
