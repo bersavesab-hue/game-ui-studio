@@ -293,9 +293,17 @@ class EditorViewModel : ViewModel() {
             val normalized = data.elements
                 .sortedBy { it.zIndex }
                 .mapIndexed { index, element -> element.copy(zIndex = index) }
+            val baseName = data.pageName.ifBlank { "Web UI 自动拆页" }
+            val existingNames = pages.map { it.name }.toSet()
+            var uniqueName = baseName
+            var suffix = 2
+            while (uniqueName in existingNames) {
+                uniqueName = "$baseName · $suffix"
+                suffix++
+            }
             val page = EditorPage(
                 id = UUID.randomUUID().toString(),
-                name = data.pageName.ifBlank { "Web UI 自动拆页" },
+                name = uniqueName,
                 elements = normalized
             )
             pages += page
@@ -304,6 +312,36 @@ class EditorViewModel : ViewModel() {
             elements.addAll(normalized)
             selectedIds.clear()
             activeGroupEditId = null
+        }
+    }
+
+    fun addReferenceBackground(path: String, name: String, aspectRatio: Float) {
+        val asset = AssetRecord(
+            id = UUID.randomUUID().toString(),
+            name = name,
+            path = path,
+            aspectRatio = aspectRatio.coerceAtLeast(0.05f)
+        )
+        mutate {
+            if (assetLibrary.none { it.path == path }) assetLibrary += asset
+            val minZ = (elements.minOfOrNull { it.zIndex } ?: 0) - 1
+            elements += EditorElement(
+                id = UUID.randomUUID().toString(),
+                type = ElementType.IMAGE,
+                name = "底稿 · $name",
+                x = 0f,
+                y = 0f,
+                width = DESIGN_WIDTH,
+                height = DESIGN_HEIGHT,
+                zIndex = minZ,
+                locked = true,
+                assetPath = path,
+                assetId = asset.id,
+                opacity = 0.35f,
+                isBackground = true,
+                imageFit = ImageFit.COVER
+            )
+            normalizeZ()
         }
     }
 
