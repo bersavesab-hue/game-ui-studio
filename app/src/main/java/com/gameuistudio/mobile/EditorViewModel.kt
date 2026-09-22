@@ -36,6 +36,10 @@ class EditorViewModel : ViewModel() {
         private set
     var snapGuideY by mutableStateOf<Float?>(null)
         private set
+    var snapDistanceX by mutableStateOf<Float?>(null)
+        private set
+    var snapDistanceY by mutableStateOf<Float?>(null)
+        private set
     var activeGroupEditId by mutableStateOf<String?>(null)
         private set
 
@@ -53,6 +57,7 @@ class EditorViewModel : ViewModel() {
     private val undoStack = ArrayDeque<Snapshot>()
     private val redoStack = ArrayDeque<Snapshot>()
     private var transactionOpen = false
+    private var styleClipboard: EditorElement? = null
 
     val selectedId: String?
         get() = selectedIds.lastOrNull()
@@ -516,6 +521,85 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    val hasCopiedStyle: Boolean
+        get() = styleClipboard != null
+
+    fun copySelectedStyle() {
+        if (selectedIds.size != 1) return
+        styleClipboard = selected
+        revision++
+    }
+
+    fun pasteCopiedStyle() {
+        val source = styleClipboard ?: return
+        val ids = selectedIds.toSet()
+        if (ids.isEmpty()) return
+        mutate {
+            ids.forEach { id ->
+                replace(id) { target ->
+                    target.copy(
+                        opacity = source.opacity,
+                        cornerRadius = source.cornerRadius,
+                        brightness = if (target.type == ElementType.IMAGE) source.brightness else target.brightness,
+                        contrast = if (target.type == ElementType.IMAGE) source.contrast else target.contrast,
+                        saturation = if (target.type == ElementType.IMAGE) source.saturation else target.saturation,
+                        imageFit = if (target.type == ElementType.IMAGE) source.imageFit else target.imageFit,
+                        fillColor = source.fillColor,
+                        gradientEnabled = source.gradientEnabled,
+                        gradientEndColor = source.gradientEndColor,
+                        textColor = source.textColor,
+                        borderColor = source.borderColor,
+                        borderWidth = source.borderWidth,
+                        shadowAlpha = source.shadowAlpha,
+                        shadowRadius = source.shadowRadius,
+                        shadowOffsetY = source.shadowOffsetY,
+                        textAlign = if (target.type == ElementType.TEXT || target.type == ElementType.BUTTON) source.textAlign else target.textAlign,
+                        fontWeightMode = if (target.type == ElementType.TEXT || target.type == ElementType.BUTTON) source.fontWeightMode else target.fontWeightMode,
+                        fontFamilyMode = if (target.type == ElementType.TEXT || target.type == ElementType.BUTTON) source.fontFamilyMode else target.fontFamilyMode,
+                        fontSize = if (target.type == ElementType.TEXT || target.type == ElementType.BUTTON) source.fontSize else target.fontSize
+                    )
+                }
+            }
+        }
+    }
+
+    fun makeSameWidth() {
+        val reference = selected ?: return
+        val items = selection.filterNot { it.locked || it.isBackground }
+        if (items.size < 2) return
+        mutate {
+            items.forEach { item ->
+                val width = reference.width.coerceIn(40f, DESIGN_WIDTH - item.x)
+                replace(item.id) { it.copy(width = width) }
+            }
+        }
+    }
+
+    fun makeSameHeight() {
+        val reference = selected ?: return
+        val items = selection.filterNot { it.locked || it.isBackground }
+        if (items.size < 2) return
+        mutate {
+            items.forEach { item ->
+                val height = reference.height.coerceIn(40f, DESIGN_HEIGHT - item.y)
+                replace(item.id) { it.copy(height = height) }
+            }
+        }
+    }
+
+    fun makeSameSize() {
+        val reference = selected ?: return
+        val items = selection.filterNot { it.locked || it.isBackground }
+        if (items.size < 2) return
+        mutate {
+            items.forEach { item ->
+                val width = reference.width.coerceIn(40f, DESIGN_WIDTH - item.x)
+                val height = reference.height.coerceIn(40f, DESIGN_HEIGHT - item.y)
+                replace(item.id) { it.copy(width = width, height = height) }
+            }
+        }
+    }
+
     fun alignSelected(command: String) {
         val items = selection.filterNot { it.locked }
         if (items.isEmpty()) return
@@ -597,13 +681,21 @@ class EditorViewModel : ViewModel() {
             val xSnap = bestSelectionXSnap(moving, bounds, adjustedDx)
             val ySnap = bestSelectionYSnap(moving, bounds, adjustedDy)
             if (xSnap != null) {
+                snapDistanceX = abs(xSnap.value - dx)
                 adjustedDx = xSnap.value
                 snapGuideX = xSnap.guide
-            } else snapGuideX = null
+            } else {
+                snapGuideX = null
+                snapDistanceX = null
+            }
             if (ySnap != null) {
+                snapDistanceY = abs(ySnap.value - dy)
                 adjustedDy = ySnap.value
                 snapGuideY = ySnap.guide
-            } else snapGuideY = null
+            } else {
+                snapGuideY = null
+                snapDistanceY = null
+            }
         } else clearSnapGuides()
 
         moving.forEach { item -> replace(item.id) { it.copy(x = it.x + adjustedDx, y = it.y + adjustedDy) } }
@@ -852,7 +944,7 @@ class EditorViewModel : ViewModel() {
         mutate { assetLibrary.removeAll { it.id == assetId } }
     }
 
-    fun saveSelectionAsComponent() {
+    fun saveSelectionAsComponent(name: String = "") {
         val source = selection.sortedBy { it.zIndex }
         if (source.isEmpty()) return
         val bounds = boundsOf(source)
@@ -870,7 +962,7 @@ class EditorViewModel : ViewModel() {
             }
             components += ComponentTemplate(
                 id = UUID.randomUUID().toString(),
-                name = "组件 ${components.size + 1}",
+                name = name.ifBlank { "组件 ${components.size + 1}" },
                 width = bounds.width.coerceAtLeast(40f),
                 height = bounds.height.coerceAtLeast(40f),
                 elements = normalized
@@ -902,15 +994,27 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun renameComponent(componentId: String, name: String) {
+        if (name.isBlank()) return
+        mutate {
+            val index = components.indexOfFirst { it.id == componentId }
+            if (index >= 0) components[index] = components[index].copy(name = name.trim())
+        }
+    }
+
     fun deleteComponent(componentId: String) {
         mutate { components.removeAll { it.id == componentId } }
     }
 
-    fun saveCurrentPageAsTemplate() {
+    fun saveCurrentPageAsTemplate(name: String = "") {
         val source = snapshotCurrentPage() ?: return
         mutate {
             val cloned = source.elements.map { e -> e.copy(id = UUID.randomUUID().toString()) }
-            pageTemplates += PageTemplate(UUID.randomUUID().toString(), "模板 ${pageTemplates.size + 1}", cloned)
+            pageTemplates += PageTemplate(
+                UUID.randomUUID().toString(),
+                name.ifBlank { "模板 ${pageTemplates.size + 1}" },
+                cloned
+            )
         }
     }
 
@@ -931,6 +1035,14 @@ class EditorViewModel : ViewModel() {
             elements.clear(); elements.addAll(cloned.sortedBy { it.zIndex })
             selectedIds.clear()
             activeGroupEditId = null
+        }
+    }
+
+    fun renamePageTemplate(templateId: String, name: String) {
+        if (name.isBlank()) return
+        mutate {
+            val index = pageTemplates.indexOfFirst { it.id == templateId }
+            if (index >= 0) pageTemplates[index] = pageTemplates[index].copy(name = name.trim())
         }
     }
 
@@ -1111,6 +1223,8 @@ class EditorViewModel : ViewModel() {
     private fun clearSnapGuides() {
         snapGuideX = null
         snapGuideY = null
+        snapDistanceX = null
+        snapDistanceY = null
     }
 
     private fun mutate(block: () -> Unit) {
