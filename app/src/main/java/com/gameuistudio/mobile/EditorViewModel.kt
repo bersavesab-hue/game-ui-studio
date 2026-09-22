@@ -67,7 +67,7 @@ class EditorViewModel : ViewModel() {
         get() = currentPageId?.let { id -> pages.firstOrNull { it.id == id } }
 
     private fun migratePortraitProject(project: ProjectData?): ProjectData? {
-        if (sourceProject == null) return null
+        if (project == null) return null
         if (project.designWidth <= project.designHeight) return project
 
         val sx = DESIGN_WIDTH / project.designWidth.coerceAtLeast(1f)
@@ -88,7 +88,7 @@ class EditorViewModel : ViewModel() {
             version = 4,
             designWidth = DESIGN_WIDTH,
             designHeight = DESIGN_HEIGHT,
-            pages = sourceProject.pages.map { page -> page.copy(elements = page.elements.map(::migrateElement)) },
+            pages = project.pages.map { page -> page.copy(elements = page.elements.map(::migrateElement)) },
             components = project.components.map { component ->
                 component.copy(
                     width = component.width * sx,
@@ -99,7 +99,7 @@ class EditorViewModel : ViewModel() {
             pageTemplates = project.pageTemplates.map { template ->
                 template.copy(elements = template.elements.map(::migrateElement))
             },
-            elements = sourceProject.elements.map(::migrateElement)
+            elements = project.elements.map(::migrateElement)
         )
     }
 
