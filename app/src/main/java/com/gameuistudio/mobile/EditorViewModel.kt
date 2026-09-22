@@ -807,7 +807,7 @@ class EditorViewModel : ViewModel() {
         mutate { replace(id) { it.copy(gradientEnabled = !it.gradientEnabled) } }
     }
 
-    fun updateVisualStyle(
+    fun updateVisualStyleTransient(
         radius: Float? = null,
         opacity: Float? = null,
         borderWidth: Float? = null,
@@ -817,17 +817,15 @@ class EditorViewModel : ViewModel() {
     ) {
         val id = selectedId ?: return
         if (selectedIds.size != 1) return
-        mutate {
-            replace(id) { e ->
-                e.copy(
-                    cornerRadius = radius?.coerceIn(0f, 240f) ?: e.cornerRadius,
-                    opacity = opacity?.coerceIn(0f, 1f) ?: e.opacity,
-                    borderWidth = borderWidth?.coerceIn(0f, 40f) ?: e.borderWidth,
-                    shadowAlpha = shadowAlpha?.coerceIn(0f, 1f) ?: e.shadowAlpha,
-                    shadowRadius = shadowRadius?.coerceIn(0f, 80f) ?: e.shadowRadius,
-                    shadowOffsetY = shadowOffsetY?.coerceIn(-80f, 80f) ?: e.shadowOffsetY
-                )
-            }
+        replace(id) { e ->
+            e.copy(
+                cornerRadius = radius?.coerceIn(0f, 240f) ?: e.cornerRadius,
+                opacity = opacity?.coerceIn(0f, 1f) ?: e.opacity,
+                borderWidth = borderWidth?.coerceIn(0f, 40f) ?: e.borderWidth,
+                shadowAlpha = shadowAlpha?.coerceIn(0f, 1f) ?: e.shadowAlpha,
+                shadowRadius = shadowRadius?.coerceIn(0f, 80f) ?: e.shadowRadius,
+                shadowOffsetY = shadowOffsetY?.coerceIn(-80f, 80f) ?: e.shadowOffsetY
+            )
         }
     }
 
