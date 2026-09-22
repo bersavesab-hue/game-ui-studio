@@ -37,7 +37,7 @@ jobs:
           test -f "$SRC/settings.gradle.kts"
           cp -a "$SRC"/. ./
           rm -rf bootstrap
-          rm -f .github/workflows/bootstrap-source.yml
+          rm -f .github/workflows/android-build.yml
 
       - name: Commit reconstructed source
         shell: bash
@@ -57,15 +57,16 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
 
       - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
