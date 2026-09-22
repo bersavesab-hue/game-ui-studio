@@ -486,6 +486,19 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun nudgeSelected(dx: Float, dy: Float) {
+        val moving = selection.filterNot { it.locked || it.isBackground }
+        if (moving.isEmpty()) return
+        val bounds = boundsOf(moving)
+        val allowedDx = dx.coerceIn(-bounds.left, DESIGN_WIDTH - bounds.right)
+        val allowedDy = dy.coerceIn(-bounds.top, DESIGN_HEIGHT - bounds.bottom)
+        mutate {
+            moving.forEach { item ->
+                replace(item.id) { it.copy(x = it.x + allowedDx, y = it.y + allowedDy) }
+            }
+        }
+    }
+
     fun alignSelected(command: String) {
         val items = selection.filterNot { it.locked }
         if (items.isEmpty()) return
