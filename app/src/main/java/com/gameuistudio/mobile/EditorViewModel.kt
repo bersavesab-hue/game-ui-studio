@@ -600,6 +600,18 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun resizeSelectionTo(width: Float?, height: Float?) {
+        val items = selection.filterNot { it.locked || it.isBackground }
+        if (items.isEmpty()) return
+        mutate {
+            items.forEach { item ->
+                val newWidth = (width ?: item.width).coerceIn(40f, DESIGN_WIDTH - item.x)
+                val newHeight = (height ?: item.height).coerceIn(40f, DESIGN_HEIGHT - item.y)
+                replace(item.id) { it.copy(width = newWidth, height = newHeight) }
+            }
+        }
+    }
+
     fun alignSelected(command: String) {
         val items = selection.filterNot { it.locked }
         if (items.isEmpty()) return
