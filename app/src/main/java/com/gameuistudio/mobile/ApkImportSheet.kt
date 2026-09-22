@@ -33,6 +33,7 @@ fun ApkImportSheet(
     onDismiss: () -> Unit,
     onImportImages: () -> Unit,
     onCreateRebuildPage: () -> Unit,
+    onOpenWebCapture: () -> Unit,
     onOpenLibrary: () -> Unit
 ) {
     ModalBottomSheet(
@@ -74,6 +75,13 @@ fun ApkImportSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActionButton("图片加入素材库", primary = true, onClick = onImportImages)
                 ActionButton("新建重建设计页", onClick = onCreateRebuildPage)
+            }
+            if (
+                result.framework == ApkFramework.WEBVIEW &&
+                result.resources.any { it.archivePath.equals("assets/index.html", ignoreCase = true) }
+            ) {
+                Spacer(Modifier.height(7.dp))
+                ActionButton("运行原页面并自动拆层", primary = true, onClick = onOpenWebCapture)
             }
             Spacer(Modifier.height(7.dp))
             ActionButton("打开素材库", onClick = onOpenLibrary)
