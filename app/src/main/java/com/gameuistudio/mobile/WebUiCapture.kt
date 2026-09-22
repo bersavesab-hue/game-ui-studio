@@ -45,15 +45,20 @@ data class WebRebuildData(
     val assets: List<AssetRecord>
 )
 
+@Serializable
+data class ScrollMetrics(
+    val documentHeight: Float,
+    val viewportHeight: Float
+)
+
 object WebUiCapture {
     private val json = Json { ignoreUnknownKeys = true }
 
     val captureScript: String = """
         (function() {
-          function rgbaVisible(v) {
-            if (!v) return false;
-            if (v === 'transparent') return false;
-            var m = v.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
+          function alphaVisible(v) {
+            if (!v || v === 'transparent') return false;
+            var m = v.match(/rgba\\([^,]+,[^,]+,[^,]+,\\s*([\\d.]+)\\)/);
             return !m || parseFloat(m[1]) > 0.02;
           }
           function px(v) {
@@ -61,45 +66,45 @@ object WebUiCapture {
             return isFinite(n) ? n : 0;
           }
           function cleanText(v) {
-            return (v || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+            return (v || '').replace(/\\s+/g, ' ').trim().slice(0, 160);
           }
-          var all = Array.from(document.querySelectorAll('body *'));
+          function visibleRect(r) {
+            return r && r.width >= 6 && r.height >= 6 &&
+              r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+          }
+          function bgUrl(v) {
+            if (!v || v === 'none') return '';
+            var m = v.match(/url\\(["']?(.+?)["']?\\)/);
+            return m ? m[1] : '';
+          }
+
           var out = [];
-          for (var i = 0; i < all.length && out.length < 320; i++) {
-            var e = all[i];
-            if (!e || ['SCRIPT','STYLE','META','LINK','NOSCRIPT'].includes(e.tagName)) continue;
-            var cs = getComputedStyle(e);
-            if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity || '1') < 0.02) continue;
-            var r = e.getBoundingClientRect();
-            if (r.width < 6 || r.height < 6) continue;
-            if (r.bottom < 0 || r.right < 0 || r.top > innerHeight || r.left > innerWidth) continue;
+          var seen = new Set();
 
-            var tag = (e.tagName || '').toLowerCase();
-            var role = (e.getAttribute('role') || '').toLowerCase();
-            var interactive = tag === 'button' || tag === 'a' || role === 'button' ||
-              tag === 'input' || tag === 'select' || tag === 'textarea' ||
-              typeof e.onclick === 'function' || cs.cursor === 'pointer';
-
-            var img = tag === 'img' || (cs.backgroundImage && cs.backgroundImage !== 'none');
-            var text = cleanText(e.innerText || e.textContent || '');
-            var hasInteractiveParent = !!e.parentElement && !!e.parentElement.closest('button,a,[role="button"]');
-            var leafText = text.length > 0 && e.children.length === 0 && !hasInteractiveParent;
-            var panel = !interactive && !img && rgbaVisible(cs.backgroundColor) &&
-              r.width * r.height > 600 && r.width < innerWidth * 0.98 && r.height < innerHeight * 0.98;
-
-            var kind = interactive ? 'button' : (img ? 'image' : (leafText ? 'text' : (panel ? 'panel' : '')));
-            if (!kind) continue;
-
+          function pushNode(kind, e, cs, r, text, pseudo) {
             var src = '';
-            if (tag === 'img') src = e.currentSrc || e.src || '';
+            var tag = (e.tagName || '').toLowerCase();
+            if (!pseudo && tag === 'img') src = e.currentSrc || e.src || '';
+            var bg = cs.backgroundImage || '';
+            var key = [
+              kind,
+              Math.round(r.left), Math.round(r.top),
+              Math.round(r.width), Math.round(r.height),
+              cleanText(text),
+              src || bgUrl(bg),
+              pseudo || ''
+            ].join('|');
+            if (seen.has(key)) return;
+            seen.add(key);
+
             out.push({
               kind: kind,
-              tag: tag,
-              text: text,
+              tag: pseudo ? (tag + pseudo) : tag,
+              text: cleanText(text),
               x: Math.max(0, r.left),
               y: Math.max(0, r.top),
-              width: Math.min(r.width, innerWidth - Math.max(0, r.left)),
-              height: Math.min(r.height, innerHeight - Math.max(0, r.top)),
+              width: Math.max(1, Math.min(r.width, innerWidth - Math.max(0, r.left))),
+              height: Math.max(1, Math.min(r.height, innerHeight - Math.max(0, r.top))),
               color: cs.color || '',
               backgroundColor: cs.backgroundColor || '',
               fontSize: px(cs.fontSize),
@@ -109,8 +114,51 @@ object WebUiCapture {
               borderColor: cs.borderTopColor || '',
               opacity: parseFloat(cs.opacity || '1') || 1,
               src: src,
-              backgroundImage: cs.backgroundImage || '',
+              backgroundImage: bg,
               zIndex: parseInt(cs.zIndex || '0') || 0
+            });
+          }
+
+          var all = Array.from(document.querySelectorAll('body *'));
+          for (var i = 0; i < all.length && out.length < 420; i++) {
+            var e = all[i];
+            if (!e || ['SCRIPT','STYLE','META','LINK','NOSCRIPT'].includes(e.tagName)) continue;
+            var cs = getComputedStyle(e);
+            if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity || '1') < 0.02) continue;
+            var r = e.getBoundingClientRect();
+            if (!visibleRect(r)) continue;
+
+            var tag = (e.tagName || '').toLowerCase();
+            var role = (e.getAttribute('role') || '').toLowerCase();
+            var interactive = tag === 'button' || tag === 'a' || role === 'button' ||
+              tag === 'input' || tag === 'select' || tag === 'textarea' ||
+              typeof e.onclick === 'function' || cs.cursor === 'pointer';
+
+            var imageLike = tag === 'img' || bgUrl(cs.backgroundImage).length > 0;
+            var text = cleanText(e.innerText || e.textContent || '');
+            var insideInteractive = !!e.parentElement && !!e.parentElement.closest('button,a,[role="button"]');
+            var leafText = text.length > 0 && e.children.length === 0 && !insideInteractive;
+            var panel = !interactive && !imageLike && alphaVisible(cs.backgroundColor) &&
+              r.width * r.height > 600 &&
+              r.width < innerWidth * 0.99 &&
+              r.height < innerHeight * 0.99;
+
+            var kind = interactive ? 'button' : (imageLike ? 'image' : (leafText ? 'text' : (panel ? 'panel' : '')));
+            if (kind) pushNode(kind, e, cs, r, text, '');
+
+            ['::before','::after'].forEach(function(pseudo) {
+              if (out.length >= 420) return;
+              var ps = getComputedStyle(e, pseudo);
+              if (!ps || ps.display === 'none' || ps.visibility === 'hidden') return;
+              var content = ps.content || '';
+              var hasContent = content && content !== 'none' && content !== 'normal' && content !== '""';
+              var pseudoImage = bgUrl(ps.backgroundImage).length > 0;
+              var pseudoPanel = alphaVisible(ps.backgroundColor);
+              if (!hasContent && !pseudoImage && !pseudoPanel) return;
+
+              var pkind = pseudoImage ? 'image' : (hasContent ? 'text' : 'panel');
+              var ptext = hasContent ? content.replace(/^['"]|['"]$/g, '') : '';
+              pushNode(pkind, e, ps, r, ptext, pseudo);
             });
           }
 
@@ -132,6 +180,26 @@ object WebUiCapture {
         return runCatching {
             val decoded = json.parseToJsonElement(raw).jsonPrimitive.content
             json.decodeFromString<DomCapture>(decoded)
+        }.getOrNull()
+    }
+
+    val scrollMetricsScript: String = """
+        (function() {
+          return JSON.stringify({
+            documentHeight: Math.max(
+              document.body ? document.body.scrollHeight : 0,
+              document.documentElement ? document.documentElement.scrollHeight : 0,
+              innerHeight
+            ),
+            viewportHeight: Math.max(1, innerHeight)
+          });
+        })();
+    """.trimIndent()
+
+    fun decodeScrollMetrics(raw: String): ScrollMetrics? {
+        return runCatching {
+            val decoded = json.parseToJsonElement(raw).jsonPrimitive.content
+            json.decodeFromString<ScrollMetrics>(decoded)
         }.getOrNull()
     }
 
