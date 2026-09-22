@@ -1070,6 +1070,71 @@ private fun EditorElementView(
     }
 }
 
+private fun editorFontWeight(mode: FontWeightMode): FontWeight = when (mode) {
+    FontWeightMode.NORMAL -> FontWeight.Normal
+    FontWeightMode.MEDIUM -> FontWeight.Medium
+    FontWeightMode.BOLD -> FontWeight.Bold
+}
+
+private fun editorTextAlign(mode: TextAlignMode): TextAlign = when (mode) {
+    TextAlignMode.LEFT -> TextAlign.Left
+    TextAlignMode.CENTER -> TextAlign.Center
+    TextAlignMode.RIGHT -> TextAlign.Right
+}
+
+private fun editorAlignment(mode: TextAlignMode): Alignment = when (mode) {
+    TextAlignMode.LEFT -> Alignment.CenterStart
+    TextAlignMode.CENTER -> Alignment.Center
+    TextAlignMode.RIGHT -> Alignment.CenterEnd
+}
+
+@Composable
+private fun StyledElementSurface(
+    element: EditorElement,
+    renderScale: Float,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val radius = (element.cornerRadius * renderScale).dp
+    val shape = RoundedCornerShape(radius)
+    Box(Modifier.fillMaxSize()) {
+        if (element.shadowAlpha > 0.01f && element.shadowRadius > 0.5f) {
+            Box(
+                Modifier.fillMaxSize()
+                    .offset(y = (element.shadowOffsetY * renderScale).dp)
+                    .clip(shape)
+                    .background(
+                        Color.Black.copy(
+                            alpha = (element.shadowAlpha * (0.25f + element.shadowRadius / 160f))
+                                .coerceIn(0f, 0.75f)
+                        )
+                    )
+            )
+        }
+
+        var surface = Modifier.fillMaxSize().clip(shape)
+        surface = if (element.gradientEnabled) {
+            surface.background(
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color(element.fillColor).copy(alpha = element.opacity),
+                        Color(element.gradientEndColor).copy(alpha = element.opacity)
+                    )
+                )
+            )
+        } else {
+            surface.background(Color(element.fillColor).copy(alpha = element.opacity))
+        }
+        if (element.borderWidth > 0.1f) {
+            surface = surface.border(
+                width = (element.borderWidth * renderScale).dp,
+                color = Color(element.borderColor),
+                shape = shape
+            )
+        }
+        Box(surface, contentAlignment = editorAlignment(element.textAlign), content = content)
+    }
+}
+
 @Composable
 private fun BoxScope.ResizeHandle(
     alignment: Alignment,
