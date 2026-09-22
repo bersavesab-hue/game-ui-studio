@@ -373,6 +373,80 @@ class EditorViewModel : ViewModel() {
         setSelection(listOf(item.id))
     }
 
+    fun createStoreManagementSkeleton() {
+        mutate {
+            syncCurrentPage()
+
+            val sections = listOf(
+                Triple("顶部状态栏", 0f, 130f),
+                Triple("门店主视觉区", 130f, 260f),
+                Triple("集团经营概况", 390f, 260f),
+                Triple("旗下门店", 650f, 560f),
+                Triple("今日待办", 1210f, 280f),
+                Triple("门店管理功能", 1490f, 270f),
+                Triple("底部导航栏", 1760f, 160f)
+            )
+            val fills = listOf(
+                0xFFE8EEF8.toInt(),
+                0xFFF7EFE2.toInt(),
+                0xFFF1F5F9.toInt(),
+                0xFFF8FAFC.toInt(),
+                0xFFFFF7E8.toInt(),
+                0xFFF0F9F4.toInt(),
+                0xFFE8EEF8.toInt()
+            )
+
+            val created = mutableListOf<EditorElement>()
+            sections.forEachIndexed { index, (name, y, height) ->
+                val group = UUID.randomUUID().toString()
+                created += EditorElement(
+                    id = UUID.randomUUID().toString(),
+                    type = ElementType.PANEL,
+                    name = name,
+                    x = 0f,
+                    y = y,
+                    width = DESIGN_WIDTH,
+                    height = height,
+                    zIndex = index * 2,
+                    groupId = group,
+                    cornerRadius = 0f,
+                    fillColor = fills[index],
+                    borderColor = 0x22334155,
+                    borderWidth = 1f,
+                    opacity = 1f
+                )
+                created += EditorElement(
+                    id = UUID.randomUUID().toString(),
+                    type = ElementType.TEXT,
+                    name = "$name · 区域标签",
+                    x = 36f,
+                    y = y + 18f,
+                    width = 520f,
+                    height = 60f,
+                    zIndex = index * 2 + 1,
+                    groupId = group,
+                    text = name,
+                    fontSize = 34f,
+                    textColor = 0xFF334155.toInt(),
+                    textAlign = TextAlignMode.LEFT,
+                    fontWeightMode = FontWeightMode.BOLD
+                )
+            }
+
+            val page = EditorPage(
+                id = UUID.randomUUID().toString(),
+                name = "门店管理",
+                elements = created
+            )
+            pages += page
+            currentPageId = page.id
+            elements.clear()
+            elements.addAll(created)
+            selectedIds.clear()
+            activeGroupEditId = null
+        }
+    }
+
     fun addText() = addSimpleElement(
         ElementType.TEXT, "文字", 420f, 100f,
         text = "文字", fontSize = 48f,
