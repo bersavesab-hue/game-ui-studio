@@ -1789,6 +1789,99 @@ private fun ModeRow(current: SizeMode, onMode: (SizeMode) -> Unit) {
 }
 
 @Composable
+private fun CompactNumberField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { incoming ->
+            onValueChange(
+                incoming.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }.take(10)
+            )
+        },
+        label = { Text(label) },
+        singleLine = true,
+        modifier = modifier
+    )
+}
+
+private fun formatArgbHex(color: Int): String = String.format("#%08X", color)
+
+private fun parseArgbHex(value: String): Int? {
+    val raw = value.trim().removePrefix("#").uppercase()
+    val normalized = when (raw.length) {
+        6 -> "FF$raw"
+        8 -> raw
+        else -> return null
+    }
+    if (normalized.any { it !in "0123456789ABCDEF" }) return null
+    return normalized.toLongOrNull(16)?.toInt()
+}
+
+@Composable
+private fun ColorHexEditor(
+    label: String,
+    color: Int,
+    onApply: (Int) -> Unit
+) {
+    var text by remember(color) { mutableStateOf(formatArgbHex(color)) }
+    val presets = listOf(
+        0xFFFFFFFF.toInt(),
+        0xFF111318.toInt(),
+        0xFF2563EB.toInt(),
+        0xFF0F766E.toInt(),
+        0xFFF59E0B.toInt(),
+        0xFFEF4444.toInt(),
+        0xFF8B5CF6.toInt(),
+        0xFFEC4899.toInt()
+    )
+
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Row(
+            Modifier.fillMaxWidth().padding(top = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it.take(9) },
+                label = { Text("#AARRGGBB") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            TinyButton("应用", {
+                parseArgbHex(text)?.let(onApply)
+            }, primary = true)
+        }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            presets.forEach { preset ->
+                Box(
+                    Modifier.size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(preset))
+                        .border(
+                            if (preset == color) 3.dp else 1.dp,
+                            if (preset == color) Color(0xFF60A5FA) else Color(0xFF697382),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable {
+                            text = formatArgbHex(preset)
+                            onApply(preset)
+                        }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ImageStyleSlider(
     label: String,
     value: Float,
