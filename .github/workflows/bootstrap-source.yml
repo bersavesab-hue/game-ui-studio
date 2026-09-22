@@ -1,3 +1,4 @@
+# bootstrap trigger
 name: Bootstrap source and build APK
 
 on:
