@@ -50,6 +50,17 @@ object ProjectStorage {
         return "assets/$fileName"
     }
 
+    fun importFileAsset(context: Context, source: File, preferredName: String = source.name): String {
+        ensure(context)
+        val ext = preferredName.substringAfterLast('.', source.extension.ifBlank { "bin" }).take(8).ifBlank { "bin" }
+        val fileName = "${UUID.randomUUID()}.$ext"
+        val dest = File(assets(context), fileName)
+        source.inputStream().use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+        }
+        return "assets/$fileName"
+    }
+
     fun assetFile(context: Context, relativePath: String): File = File(root(context), relativePath)
 
     fun projectJson(project: ProjectData): String = json.encodeToString(project)
