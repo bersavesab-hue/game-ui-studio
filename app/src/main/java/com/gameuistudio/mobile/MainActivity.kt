@@ -116,6 +116,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var showMoreTools by remember { mutableStateOf(false) }
     var showAdaptation by remember { mutableStateOf(false) }
     var showQuickActions by remember { mutableStateOf(false) }
+    var showBatchSize by remember { mutableStateOf(false) }
     var customPreset by remember { mutableStateOf<PreviewPreset?>(null) }
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
@@ -272,6 +273,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                         onSameWidth = vm::makeSameWidth,
                         onSameHeight = vm::makeSameHeight,
                         onSameSize = vm::makeSameSize,
+                        onBatchSize = { showBatchSize = true },
                         onDuplicate = vm::duplicateSelected,
                         onDelete = vm::deleteSelected,
                         onFront = vm::bringToFront,
@@ -352,6 +354,19 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             onLock = { vm.toggleLock(); showQuickActions = false },
             onProperties = { showQuickActions = false; showProperties = true },
             onDelete = { vm.deleteSelected(); showQuickActions = false }
+        )
+    }
+
+
+    if (showBatchSize && vm.selectedIds.isNotEmpty()) {
+        BatchSizeSheet(
+            selectedCount = vm.selectedIds.size,
+            reference = vm.selected,
+            onDismiss = { showBatchSize = false },
+            onApply = { width, height ->
+                vm.resizeSelectionTo(width, height)
+                showBatchSize = false
+            }
         )
     }
 
@@ -1328,6 +1343,7 @@ private fun SelectedToolBar(
     onSameWidth: () -> Unit,
     onSameHeight: () -> Unit,
     onSameSize: () -> Unit,
+    onBatchSize: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
     onFront: () -> Unit,
@@ -1391,6 +1407,7 @@ private fun SelectedToolBar(
                 TinyButton("同宽", onSameWidth)
                 TinyButton("同高", onSameHeight)
                 TinyButton("同尺寸", onSameSize)
+                TinyButton("批量尺寸", onBatchSize, primary = true)
                 TinyButton("组合", onGroup, primary = true)
                 TinyButton("取消组合", onUngroup)
                 TinyButton("左齐", { onAlign("left") })
