@@ -257,6 +257,33 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun registerImportedAsset(path: String, name: String, aspectRatio: Float) {
+        if (assetLibrary.any { it.path == path }) return
+        mutate {
+            assetLibrary += AssetRecord(
+                id = UUID.randomUUID().toString(),
+                name = name,
+                path = path,
+                aspectRatio = aspectRatio.coerceAtLeast(0.05f)
+            )
+        }
+    }
+
+    fun createApkRebuildPage(name: String) {
+        mutate {
+            syncCurrentPage()
+            val page = EditorPage(
+                id = UUID.randomUUID().toString(),
+                name = name.ifBlank { "APK 重建设计页" }
+            )
+            pages += page
+            currentPageId = page.id
+            elements.clear()
+            selectedIds.clear()
+            activeGroupEditId = null
+        }
+    }
+
     fun insertAsset(assetId: String) {
         val asset = assetLibrary.firstOrNull { it.id == assetId } ?: return
         mutate { addImageElement(asset, elements.size) }
