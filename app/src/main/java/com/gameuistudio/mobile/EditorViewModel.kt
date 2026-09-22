@@ -85,7 +85,7 @@ class EditorViewModel : ViewModel() {
         )
 
         return project.copy(
-            version = 4,
+            version = 5,
             designWidth = DESIGN_WIDTH,
             designHeight = DESIGN_HEIGHT,
             pages = project.pages.map { page -> page.copy(elements = page.elements.map(::migrateElement)) },
@@ -151,7 +151,7 @@ class EditorViewModel : ViewModel() {
     fun toProject(): ProjectData {
         syncCurrentPage()
         return ProjectData(
-            version = 4,
+            version = 5,
             projectName = projectName,
             pages = pages.toList(),
             currentPageId = currentPageId,
@@ -444,6 +444,46 @@ class EditorViewModel : ViewModel() {
         val ids = selectedIds.toSet()
         if (ids.isEmpty()) return
         mutate { ids.forEach { id -> replace(id) { it.copy(heightMode = mode) } } }
+    }
+
+    fun toggleBackground() {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        val current = elements.firstOrNull { it.id == id } ?: return
+        if (current.type != ElementType.IMAGE) return
+        mutate {
+            if (current.isBackground) {
+                replace(id) { it.copy(isBackground = false) }
+            } else {
+                val backgroundZ = (elements.minOfOrNull { it.zIndex } ?: 0) - 1
+                replace(id) {
+                    it.copy(
+                        isBackground = true,
+                        x = 0f,
+                        y = 0f,
+                        width = DESIGN_WIDTH,
+                        height = DESIGN_HEIGHT,
+                        zIndex = backgroundZ,
+                        anchor = Anchor.TOP_LEFT,
+                        widthMode = SizeMode.STRETCH,
+                        heightMode = SizeMode.STRETCH,
+                        imageFit = ImageFit.COVER,
+                        locked = true
+                    )
+                }
+                normalizeZ()
+            }
+        }
+    }
+
+    fun setImageFit(fit: ImageFit) {
+        val id = selectedId ?: return
+        if (selectedIds.size != 1) return
+        mutate {
+            replace(id) { element ->
+                if (element.type == ElementType.IMAGE) element.copy(imageFit = fit) else element
+            }
+        }
     }
 
     fun alignSelected(command: String) {
