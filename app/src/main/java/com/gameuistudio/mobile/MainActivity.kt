@@ -46,6 +46,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -110,12 +111,14 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
     var showPages by remember { mutableStateOf(false) }
     var showLibrary by remember { mutableStateOf(false) }
     var showMoreTools by remember { mutableStateOf(false) }
+    var showAdaptation by remember { mutableStateOf(false) }
+    var customPreset by remember { mutableStateOf<PreviewPreset?>(null) }
     var canvasNavigationMode by remember { mutableStateOf(false) }
     var showPresetMenu by remember { mutableStateOf(false) }
     var pendingJson by remember { mutableStateOf("") }
 
-    val preset = PREVIEW_PRESETS[presetIndex]
-    val editable = presetIndex == 0
+    val preset = customPreset ?: PREVIEW_PRESETS[presetIndex]
+    val editable = customPreset == null && presetIndex == 0
 
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         uris.forEachIndexed { index, uri ->
@@ -187,6 +190,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
                                         vm.endTransaction()
                                     }
                                     presetIndex = index
+                                    customPreset = null
                                     canvasZoom = 1f
                                     showPresetMenu = false
                                 }
@@ -288,6 +292,7 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             onDismiss = { showMoreTools = false },
             onAddPanel = vm::addPanel,
             onLibrary = { showMoreTools = false; showLibrary = true },
+            onAdaptation = { showMoreTools = false; showAdaptation = true },
             onToggleSafe = { showSafeArea = !showSafeArea },
             onToggleSnap = vm::toggleSnapping,
             onToggleMulti = vm::toggleMultiSelectMode,
@@ -304,6 +309,24 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
         )
     }
 
+
+    if (showAdaptation) {
+        AdaptationCheckSheet(
+            elements = vm.elements.toList(),
+            customPreset = customPreset,
+            onDismiss = { showAdaptation = false },
+            onApplyCustom = { width, height ->
+                customPreset = PreviewPreset("自定义 ${width.toInt()}×${height.toInt()}", width, height)
+                canvasZoom = 1f
+            },
+            onUseDesign = {
+                customPreset = null
+                presetIndex = 0
+                canvasZoom = 1f
+            }
+        )
+    }
+
     if (showProperties && vm.selected != null && vm.selectedIds.size == 1) {
         PropertiesSheet(
             element = vm.selected!!,
@@ -311,6 +334,8 @@ fun EditorApp(vm: EditorViewModel = viewModel()) {
             onAnchor = vm::setAnchor,
             onWidthMode = vm::setWidthMode,
             onHeightMode = vm::setHeightMode,
+            onToggleBackground = vm::toggleBackground,
+            onImageFit = vm::setImageFit,
             onRotate = vm::rotateSelected,
             onFlip = vm::flipSelected,
             onReset = vm::resetImageTransform,
@@ -565,6 +590,7 @@ private fun MoreToolsSheet(
     onDismiss: () -> Unit,
     onAddPanel: () -> Unit,
     onLibrary: () -> Unit,
+    onAdaptation: () -> Unit,
     onToggleSafe: () -> Unit,
     onToggleSnap: () -> Unit,
     onToggleMulti: () -> Unit,
@@ -583,6 +609,7 @@ private fun MoreToolsSheet(
             ) {
                 TinyButton("添加面板", onAddPanel, primary = true)
                 TinyButton("素材库", onLibrary)
+                TinyButton("适配检查", onAdaptation, primary = true)
             }
             Spacer(Modifier.height(14.dp))
             Text("画布与选择", fontWeight = FontWeight.Bold)
@@ -936,7 +963,13 @@ private fun RenderImage(element: EditorElement, renderScale: Float, assetsRoot: 
         Image(
             bitmap = bitmap,
             contentDescription = element.name,
-            contentScale = ContentScale.Crop,
+            contentScale = when (element.imageFit) {
+                ImageFit.COVER -> ContentScale.Crop
+                ImageFit.CONTAIN -> ContentScale.Fit
+                ImageFit.FILL -> ContentScale.FillBounds
+                ImageFit.FIT_WIDTH -> ContentScale.FillWidth
+                ImageFit.FIT_HEIGHT -> ContentScale.FillHeight
+            },
             colorFilter = filter,
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 alpha = element.opacity
@@ -1088,6 +1121,8 @@ private fun PropertiesSheet(
     onAnchor: (Anchor) -> Unit,
     onWidthMode: (SizeMode) -> Unit,
     onHeightMode: (SizeMode) -> Unit,
+    onToggleBackground: () -> Unit,
+    onImageFit: (ImageFit) -> Unit,
     onRotate: (Float) -> Unit,
     onFlip: (Boolean) -> Unit,
     onReset: () -> Unit,
@@ -1124,6 +1159,33 @@ private fun PropertiesSheet(
             ModeRow(element.heightMode, onHeightMode)
 
             if (element.type == ElementType.IMAGE) {
+                Spacer(Modifier.height(18.dp))
+                Text("图片适配", fontWeight = FontWeight.Bold)
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TinyButton(if (element.isBackground) "取消背景" else "设为背景", onToggleBackground, primary = element.isBackground)
+                    ImageFit.entries.forEach { fit ->
+                        val label = when (fit) {
+                            ImageFit.COVER -> "铺满裁剪"
+                            ImageFit.CONTAIN -> "完整显示"
+                            ImageFit.FILL -> "拉伸"
+                            ImageFit.FIT_WIDTH -> "适应宽"
+                            ImageFit.FIT_HEIGHT -> "适应高"
+                        }
+                        TinyButton(label, { onImageFit(fit) }, primary = element.imageFit == fit)
+                    }
+                }
+                if (element.isBackground) {
+                    Text(
+                        "背景会自动覆盖当前预览屏幕；长屏只扩展背景，不强行拉动核心 UI。",
+                        fontSize = 11.sp,
+                        color = Color(0xFF9CA3AF),
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+
                 Spacer(Modifier.height(18.dp))
                 Text("图片编辑", fontWeight = FontWeight.Bold)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
