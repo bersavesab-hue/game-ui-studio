@@ -2,8 +2,8 @@ package com.gameuistudio.mobile
 
 import kotlinx.serialization.Serializable
 
-const val DESIGN_WIDTH = 1920f
-const val DESIGN_HEIGHT = 1080f
+const val DESIGN_WIDTH = 1080f
+const val DESIGN_HEIGHT = 1920f
 
 @Serializable
 enum class ElementType { IMAGE, TEXT, BUTTON, PANEL }
@@ -84,7 +84,7 @@ data class PageTemplate(
 
 @Serializable
 data class ProjectData(
-    val version: Int = 3,
+    val version: Int = 4,
     val projectName: String = "未命名 UI 工程",
     val designWidth: Float = DESIGN_WIDTH,
     val designHeight: Float = DESIGN_HEIGHT,
@@ -109,11 +109,11 @@ data class PreviewPreset(
 )
 
 val PREVIEW_PRESETS = listOf(
-    PreviewPreset("设计稿 16:9", 1920f, 1080f),
-    PreviewPreset("长屏 20:9", 2400f, 1080f),
-    PreviewPreset("超长屏", 2520f, 1080f),
-    PreviewPreset("16:10", 1920f, 1200f),
-    PreviewPreset("平板", 2560f, 1600f)
+    PreviewPreset("设计稿 9:16", 1080f, 1920f),
+    PreviewPreset("长屏 9:20", 1080f, 2400f),
+    PreviewPreset("超长屏 9:21", 1080f, 2520f),
+    PreviewPreset("10:16", 1200f, 1920f),
+    PreviewPreset("平板竖屏", 1600f, 2560f)
 )
 
 data class ResolvedRect(
